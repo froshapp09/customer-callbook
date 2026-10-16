@@ -16,12 +16,8 @@ class CallListenerService {
   bool _isListening = false;
 
   Future<bool> requestPermissions() async {
-    final statuses = await [
-      Permission.phone,
-      Permission.callLog,
-    ].request();
-    return statuses[Permission.phone]?.isGranted == true ||
-        statuses[Permission.callLog]?.isGranted == true;
+    final status = await Permission.phone.request();
+    return status.isGranted;
   }
 
   Future<void> startListening(BuildContext context) async {
