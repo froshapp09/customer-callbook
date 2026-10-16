@@ -24,13 +24,49 @@ class CallListenerService {
     const android = AndroidInitializationSettings('@mipmap/ic_launcher');
     const initSettings = InitializationSettings(android: android);
     await _notifications.initialize(initSettings);
+
+    // کانال نوتیفیکیشن
+    final androidPlugin = _notifications.resolvePlatformSpecificImplementation<
+        AndroidFlutterLocalNotificationsPlugin>();
+    await androidPlugin?.createNotificationChannel(
+      const AndroidNotificationChannel(
+        'incoming_calls',
+        'تماس‌های ورودی',
+        description: 'نمایش اطلاعات تماس‌گیرنده',
+        importance: Importance.max,
+      ),
+    );
     _notifReady = true;
   }
 
+  /// درخواست همه مجوزهای لازم + باز وضعیت
+  Future<Map<String, bool>> requestAllPermissions() async {
+    final results = <String, bool>{};
+
+    // مجوز تلفن (اصلی برای تشخیص تماس)
+    var phone = await Permission.phone.status;
+    if (!phone.isGranted) {
+      phone = await Permission.phone.request();
+    }
+    results['phone'] = phone.isGranted;
+
+    // نوتیفیکیشن (اندروید ۱۳+)
+    var notif = await Permission.notification.status;
+    if (!notif.isGranted) {
+      notif = await Permission.notification.request();
+    }
+    results['notification'] = notif.isGranted;
+
+    return results;
+  }
+
   Future<bool> requestPermissions() async {
-    final phone = await Permission.phone.request();
-    await Permission.notification.request();
-    return phone.isGranted;
+    final r = await requestAllPermissions();
+    return r['phone'] == true;
+  }
+
+  Future<bool> get isPhonePermissionGranted async {
+    return await Permission.phone.isGranted;
   }
 
   Future<void> startListening(BuildContext context) async {
@@ -38,9 +74,9 @@ class CallListenerService {
     if (_isListening) return;
 
     await initNotifications();
-    final granted = await requestPermissions();
+    final granted = await Permission.phone.isGranted;
     if (!granted) {
-      debugPrint('مجوز تماس داده نشد');
+      debugPrint('مجوز تماس هنوز داده نشده');
       return;
     }
 
@@ -53,10 +89,8 @@ class CallListenerService {
         final customer = await _customerService.findByPhone(number);
         await _customerService.recordCall(number, name: customer?.name);
 
-        // نوتیفیکیشن قوی (حتی اگر اپ در پس‌زمینه باشد)
         await _showCallNotification(number, customer);
 
-        // پاپ‌آپ اگر اپ باز باشد
         if (_context != null && _context!.mounted) {
           _showIncomingPopup(_context!, number, customer);
         }
@@ -87,8 +121,6 @@ class CallListenerService {
       visibility: NotificationVisibility.public,
       playSound: true,
       enableVibration: true,
-      ongoing: false,
-      autoCancel: true,
     );
 
     await _notifications.show(
@@ -119,13 +151,6 @@ class CallListenerService {
                   color: const Color(0xFF0F172A),
                   borderRadius: BorderRadius.circular(24),
                   border: Border.all(color: const Color(0xFF1E293B)),
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFF14B8A6).withOpacity(0.15),
-                      blurRadius: 40,
-                      spreadRadius: 0,
-                    ),
-                  ],
                 ),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -147,19 +172,11 @@ class CallListenerService {
                     const SizedBox(height: 20),
                     Text(
                       customer?.name ?? 'مشتری جدید',
-                      style: const TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.white,
-                        letterSpacing: -0.5,
-                      ),
+                      style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w700, color: Colors.white),
                       textAlign: TextAlign.center,
                     ),
                     const SizedBox(height: 8),
-                    Text(
-                      number,
-                      style: const TextStyle(fontSize: 16, color: Color(0xFF94A3B8), letterSpacing: 1),
-                    ),
+                    Text(number, style: const TextStyle(fontSize: 16, color: Color(0xFF94A3B8))),
                     if (customer != null) ...[
                       const SizedBox(height: 16),
                       Container(
@@ -170,23 +187,9 @@ class CallListenerService {
                         ),
                         child: Text(
                           '${customer.callCount} تماس قبلی',
-                          style: const TextStyle(
-                            color: Color(0xFF14B8A6),
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                          ),
+                          style: const TextStyle(color: Color(0xFF14B8A6), fontSize: 13, fontWeight: FontWeight.w600),
                         ),
                       ),
-                      if (customer.note != null && customer.note!.isNotEmpty) ...[
-                        const SizedBox(height: 14),
-                        Text(
-                          customer.note!,
-                          style: const TextStyle(color: Color(0xFF64748B), fontSize: 13, height: 1.4),
-                          textAlign: TextAlign.center,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ],
                     ],
                     const SizedBox(height: 28),
                     Row(

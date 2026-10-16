@@ -35,7 +35,6 @@ class _CustomerDetailPageState extends State<CustomerDetailPage> {
     final uri = Uri(scheme: 'tel', path: _customer.phone);
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri);
-      // ثبت تماس
       final updated = _customer.copyWith(
         callCount: _customer.callCount + 1,
         lastCallAt: DateTime.now(),
@@ -52,23 +51,60 @@ class _CustomerDetailPageState extends State<CustomerDetailPage> {
     }
   }
 
+  Future<void> _sms({String? body}) async {
+    final uri = Uri(
+      scheme: 'sms',
+      path: _customer.phone,
+      queryParameters: body != null && body.isNotEmpty ? {'body': body} : null,
+    );
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri);
+    } else {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('امکان ارسال پیامک وجود ندارد')),
+        );
+      }
+    }
+  }
+
   Future<void> _delete() async {
-    final ok = await showDialog<bool>(
+    // مرحله ۱
+    final step1 = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: AppColors.surface,
         title: const Text('حذف مشتری؟'),
-        content: Text('«${_customer.name}» حذف شود؟'),
+        content: Text('«${_customer.name}» حذف شود؟
+این عمل قابل بازگشت نیست.'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('انصراف')),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('حذف', style: TextStyle(color: AppColors.danger)),
+            child: const Text('ادامه', style: TextStyle(color: AppColors.warning)),
           ),
         ],
       ),
     );
-    if (ok == true) {
+    if (step1 != true || !mounted) return;
+
+    // مرحله ۲
+    final step2 = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        title: const Text('تأیید نهایی'),
+        content: Text('مطمئن هستید «${_customer.name}» برای همیشه حذف شود؟'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('انصراف')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('حذف قطعی', style: TextStyle(color: AppColors.danger)),
+          ),
+        ],
+      ),
+    );
+    if (step2 == true) {
       await _service.delete(_customer.id);
       if (mounted) Navigator.pop(context);
     }
@@ -128,11 +164,22 @@ class _CustomerDetailPageState extends State<CustomerDetailPage> {
                 Expanded(
                   child: ElevatedButton.icon(
                     onPressed: _call,
-                    icon: const Icon(Icons.phone),
+                    icon: const Icon(Icons.phone, size: 18),
                     label: const Text('تماس'),
                   ),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () => _sms(),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF3B82F6),
+                    ),
+                    icon: const Icon(Icons.sms_outlined, size: 18),
+                    label: const Text('پیامک'),
+                  ),
+                ),
+                const SizedBox(width: 8),
                 Expanded(
                   child: OutlinedButton.icon(
                     onPressed: () async {
@@ -147,7 +194,7 @@ class _CustomerDetailPageState extends State<CustomerDetailPage> {
                         _noteCtrl.text = result.note ?? '';
                       }
                     },
-                    icon: const Icon(Icons.edit_outlined),
+                    icon: const Icon(Icons.edit_outlined, size: 18),
                     label: const Text('ویرایش'),
                   ),
                 ),

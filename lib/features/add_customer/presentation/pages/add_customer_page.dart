@@ -43,6 +43,22 @@ class _AddCustomerPageState extends State<AddCustomerPage> {
     super.dispose();
   }
 
+  Future<void> _lookupName() async {
+    final phone = _phoneCtrl.text.trim();
+    if (phone.length < 7) return;
+    final name = await _service.lookupNameFromDeviceContacts(phone);
+    if (name != null && name.isNotEmpty && mounted) {
+      setState(() => _nameCtrl.text = name);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('نام از مخاطبین پیدا شد: $name'), backgroundColor: AppColors.success),
+      );
+    } else if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('در مخاطبین گوشی پیدا نشد')),
+      );
+    }
+  }
+
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _saving = true);
@@ -129,7 +145,16 @@ class _AddCustomerPageState extends State<AddCustomerPage> {
                   return null;
                 },
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 8),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  onPressed: _lookupName,
+                  icon: const Icon(Icons.contact_phone_outlined, size: 18),
+                  label: const Text('دریافت نام از مخاطبین گوشی'),
+                ),
+              ),
+              const SizedBox(height: 12),
               Text('یادداشت (اختیاری)', style: Theme.of(context).textTheme.bodyMedium),
               const SizedBox(height: 8),
               TextFormField(

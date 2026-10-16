@@ -1,6 +1,7 @@
-import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:customer_callbook/data/models/customer.dart';
+import 'package:flutter_contacts/flutter_contacts.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 class CustomerService {
   static const _key = 'customers_list';
@@ -24,6 +25,10 @@ class CustomerService {
 
   Future<void> add(Customer customer) async {
     final list = await getAll();
+    // جلوگیری از شماره تکراری
+    final cleaned = customer.phone.replaceAll(RegExp(r'\D'), '');
+    final exists = list.any((e) => e.phone.replaceAll(RegExp(r'\D'), '') == cleaned);
+    if (exists) return;
     list.add(customer);
     await saveAll(list);
   }
@@ -46,16 +51,18 @@ class CustomerService {
   Future<Customer?> findByPhone(String phone) async {
     final list = await getAll();
     final cleaned = phone.replaceAll(RegExp(r'\D'), '');
+    if (cleaned.isEmpty) return null;
     try {
-      return list.firstWhere(
-        (e) => e.phone.replaceAll(RegExp(r'\D'), '').endsWith(cleaned) ||
-            cleaned.endsWith(e.phone.replaceAll(RegExp(r'\D'), '')),
-      );
+      return list.firstWhere((e) {
+        final p = e.phone.replaceAll(RegExp(r'\D'), '');
+        return p == cleaned || p.endsWith(cleaned) || cleaned.endsWith(p);
+      });
     } catch (_) {
       return null;
     }
   }
 
+  /// فقط وقتی تماس واقعی رخ داده فراخوانی شود
   Future<void> recordCall(String phone, {String? name}) async {
     final existing = await findByPhone(phone);
     if (existing != null) {
@@ -65,14 +72,48 @@ class CustomerService {
         firstCallAt: existing.firstCallAt ?? DateTime.now(),
       );
       await update(updated);
-    } else if (name != null && name.isNotEmpty) {
+    } else {
+      // مشتری جدید فقط اگر نام داشته باشیم از مخاطبین
+      final displayName = name ?? await lookupNameFromDeviceContacts(phone);
       await add(Customer(
-        name: name,
+        name: displayName ?? phone,
         phone: phone,
         callCount: 1,
         firstCallAt: DateTime.now(),
         lastCallAt: DateTime.now(),
       ));
     }
+  }
+
+  /// دریافت نام از دفترچه تلفن گوشی (شیائومی/هواوی/سامسونگ)
+  Future<String?> lookupNameFromDeviceContacts(String phone) async {
+    try {
+      final status = await Permission.contacts.status;
+      if (!status.isGranted) {
+        final req = await Permission.contacts.request();
+        if (!req.isGranted) return null;
+      }
+
+      if (!await FlutterContacts.requestPermission(readonly: true)) {
+        return null;
+      }
+
+      final contacts = await FlutterContacts.getContacts(withProperties: true);
+      final cleaned = phone.replaceAll(RegExp(r'\D'), '');
+      if (cleaned.length < 7) return null;
+
+      for (final c in contacts) {
+        for (final ph in c.phones) {
+          final p = ph.number.replaceAll(RegExp(r'\D'), '');
+          if (p == cleaned || p.endsWith(cleaned) || cleaned.endsWith(p)) {
+            final name = c.displayName.trim();
+            if (name.isNotEmpty) return name;
+          }
+        }
+      }
+    } catch (e) {
+      // ignore
+    }
+    return null;
   }
 }

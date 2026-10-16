@@ -4,6 +4,7 @@ import 'package:customer_callbook/data/models/customer.dart';
 import 'package:customer_callbook/data/services/customer_service.dart';
 import 'package:customer_callbook/features/customer_detail/presentation/pages/customer_detail_page.dart';
 import 'package:customer_callbook/features/add_customer/presentation/pages/add_customer_page.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class PhonebookPage extends StatefulWidget {
   final VoidCallback? onChanged;
@@ -41,6 +42,16 @@ class _PhonebookPageState extends State<PhonebookPage> {
       _filtered = list;
       _loading = false;
     });
+  }
+
+  Future<void> _dial(String phone) async {
+    final uri = Uri(scheme: 'tel', path: phone);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri);
+      await _service.recordCall(phone);
+      _load();
+      widget.onChanged?.call();
+    }
   }
 
   void _filter() {
@@ -124,7 +135,8 @@ class _PhonebookPageState extends State<PhonebookPage> {
                           return Padding(
                             padding: const EdgeInsets.only(bottom: 10),
                             child: InkWell(
-                              onTap: () async {
+                              onTap: () => _dial(c.phone),
+                              onLongPress: () async {
                                 await Navigator.push(
                                   context,
                                   MaterialPageRoute(

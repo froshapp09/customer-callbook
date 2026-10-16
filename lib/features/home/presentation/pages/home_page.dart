@@ -8,6 +8,8 @@ import 'package:customer_callbook/features/customer_detail/presentation/pages/cu
 import 'package:url_launcher/url_launcher.dart';
 import 'package:customer_callbook/services/call_listener_service.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -52,11 +54,21 @@ class _HomePageState extends State<HomePage> {
   int get _todayCount {
     final now = DateTime.now();
     return _customers.where((c) {
-      if (c.lastCallAt == null) return false;
+      // فقط تماس واقعی — افزودن مشتری جزو امروز حساب نمی‌شود
+      if (c.lastCallAt == null || c.callCount < 1) return false;
       return c.lastCallAt!.year == now.year &&
           c.lastCallAt!.month == now.month &&
           c.lastCallAt!.day == now.day;
     }).length;
+  }
+
+  Future<void> _dial(String phone) async {
+    final uri = Uri(scheme: 'tel', path: phone);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri);
+      await _service.recordCall(phone);
+      _load();
+    }
   }
 
   @override
@@ -180,7 +192,9 @@ class _HomePageState extends State<HomePage> {
                   return Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
                     child: InkWell(
-                      onTap: () async {
+                      // کلیک = تماس مستقیم | نگه‌داشتن = جزئیات
+                      onTap: () => _dial(c.phone),
+                      onLongPress: () async {
                         await Navigator.push(
                           context,
                           MaterialPageRoute(
@@ -259,49 +273,220 @@ class _HomePageState extends State<HomePage> {
       children: [
         Text('تنظیمات', style: Theme.of(context).textTheme.headlineMedium),
         const SizedBox(height: 24),
+
+        // تشخیص تماس
         _SettingsTile(
           icon: Icons.phone_callback_outlined,
           title: 'فعال‌سازی تشخیص تماس',
-          subtitle: 'مجوز تماس و نمایش پاپ‌آپ هنگام زنگ خوردن',
+          subtitle: 'مجوز تلفن برای نمایش پاپ‌آپ هنگام زنگ',
           onTap: () async {
-            final ok = await _callListener.requestPermissions();
+            final results = await _callListener.requestAllPermissions();
+            final phoneOk = results['phone'] == true;
             if (!context.mounted) return;
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(ok ? 'مجوز داده شد - تشخیص تماس فعال است' : 'مجوز داده نشد. از تنظیمات گوشی فعال کنید'),
-                backgroundColor: ok ? AppColors.success : AppColors.warning,
-              ),
-            );
-            if (ok) {
+
+            if (phoneOk) {
               await _callListener.startListening(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('تشخیص تماس فعال شد'),
+                  backgroundColor: AppColors.success,
+                ),
+              );
             } else {
-              openAppSettings();
+              // نمایش دیالوگ راهنما
+              showDialog(
+                context: context,
+                builder: (ctx) => AlertDialog(
+                  backgroundColor: AppColors.surface,
+                  title: const Text('مجوز تشخیص تماس'),
+                  content: const SingleChildScrollView(
+                    child: Text(
+                      'مجوز Phone / تلفن را فعال کنید.\n\n'
+                      'شیائومی (MIUI):\n'
+                      '• برنامه‌ها → دفترچه مشتریان → مجوزها → تلفن\n'
+                      '• نمایش روی سایر برنامه‌ها = روشن\n'
+                      '• باتری → بدون محدودیت\n'
+                      '• شروع خودکار (Autostart) = روشن\n\n'
+                      'هواوی (حتی بدون گوگل‌پلی):\n'
+                      '• برنامه‌ها → دفترچه مشتریان → مجوزها → تلفن\n'
+                      '• مدیریت باتری → دستی / بدون محدودیت\n'
+                      '• راه‌اندازی دستی = مجاز\n\n'
+                      'سامسونگ:\n'
+                      '• برنامه‌ها → دفترچه مشتریان → مجوزها → تلفن\n'
+                      '• باتری → بدون محدودیت\n\n'
+                      'سایر گوشی‌ها:\n'
+                      'تنظیمات برنامه → Permissions → Phone',
+                    ),
+                  ),
+                  actions: [
+                    TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('بعداً')),
+                    ElevatedButton(
+                      onPressed: () {
+                        Navigator.pop(ctx);
+                        openAppSettings();
+                      },
+                      child: const Text('باز کردن تنظیمات'),
+                    ),
+                  ],
+                ),
+              );
             }
           },
         ),
         const SizedBox(height: 12),
+
+        // خروجی لیست برای پنل پیامکی
+        _SettingsTile(
+          icon: Icons.upload_file_outlined,
+          title: 'خروجی لیست مشتریان',
+          subtitle: 'برای انتقال به پنل پیامکی (CSV / متن)',
+          onTap: () async {
+            final list = await _service.getAll();
+            if (list.isEmpty) {
+              if (!context.mounted) return;
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('لیست مشتریان خالی است')),
+              );
+              return;
+            }
+
+            if (!context.mounted) return;
+            showModalBottomSheet(
+              context: context,
+              backgroundColor: AppColors.surface,
+              shape: const RoundedRectangleBorder(
+                borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+              ),
+              builder: (ctx) => Directionality(
+                textDirection: TextDirection.rtl,
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text('خروجی لیست مشتریان', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
+                      const SizedBox(height: 8),
+                      Text('${list.length} مشتری', style: const TextStyle(color: AppColors.textMuted)),
+                      const SizedBox(height: 20),
+                      ListTile(
+                        leading: const Icon(Icons.table_chart_outlined, color: AppColors.primary),
+                        title: const Text('خروجی CSV (نام + شماره)'),
+                        subtitle: const Text('مناسب پنل‌های پیامکی'),
+                        onTap: () async {
+                          Navigator.pop(ctx);
+                          final buffer = StringBuffer('name,phone,call_count,note\n');
+                          for (final c in list) {
+                            final note = (c.note ?? '').replaceAll(',', ' ');
+                            buffer.writeln('${c.name},${c.phone},${c.callCount},$note');
+                          }
+                          await Share.share(
+                            buffer.toString(),
+                            subject: 'لیست مشتریان',
+                          );
+                        },
+                      ),
+                      ListTile(
+                        leading: const Icon(Icons.phone_android, color: AppColors.info),
+                        title: const Text('فقط شماره‌ها (هر خط یک شماره)'),
+                        subtitle: const Text('برای کپی در پنل SMS'),
+                        onTap: () async {
+                          Navigator.pop(ctx);
+                          final phones = list.map((c) => c.phone).join('\n');
+                          await Share.share(phones, subject: 'شماره مشتریان');
+                        },
+                      ),
+                      ListTile(
+                        leading: const Icon(Icons.text_snippet_outlined, color: AppColors.warning),
+                        title: const Text('نام و شماره (متن ساده)'),
+                        onTap: () async {
+                          Navigator.pop(ctx);
+                          final text = list.map((c) => '${c.name}: ${c.phone}').join('\n');
+                          await Share.share(text, subject: 'لیست مشتریان');
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        ),
+        const SizedBox(height: 12),
+
+        // پیامک گروهی (باز کردن اپ پیامک با چند شماره محدود)
+        _SettingsTile(
+          icon: Icons.sms_outlined,
+          title: 'ارسال پیامک به مشتری',
+          subtitle: 'از صفحه جزئیات هر مشتری هم می‌توانید پیامک بفرستید',
+          onTap: () {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('وارد جزئیات مشتری شوید و دکمه پیامک را بزنید'),
+              ),
+            );
+            setState(() => _currentIndex = 1);
+          },
+        ),
+        const SizedBox(height: 12),
+
         _SettingsTile(
           icon: Icons.delete_outline,
           title: 'پاک کردن همه مشتریان',
           subtitle: 'تمام اطلاعات حذف می‌شود',
           color: AppColors.danger,
           onTap: () async {
-            final ok = await showDialog<bool>(
+            // مرحله ۱
+            final step1 = await showDialog<bool>(
               context: context,
               builder: (ctx) => AlertDialog(
                 backgroundColor: AppColors.surface,
-                title: const Text('حذف همه؟'),
-                content: const Text('این عمل قابل بازگشت نیست.'),
+                title: const Text('حذف همه مشتریان؟'),
+                content: const Text('همه اطلاعات برای همیشه پاک می‌شود.\nاین عمل قابل بازگشت نیست.'),
                 actions: [
                   TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('انصراف')),
                   TextButton(
                     onPressed: () => Navigator.pop(ctx, true),
-                    child: const Text('حذف', style: TextStyle(color: AppColors.danger)),
+                    child: const Text('ادامه', style: TextStyle(color: AppColors.warning)),
                   ),
                 ],
               ),
             );
-            if (ok == true) {
+            if (step1 != true || !mounted) return;
+
+            // مرحله ۲ — نوشتن کلمه «حذف»
+            final confirmCtrl = TextEditingController();
+            final step2 = await showDialog<bool>(
+              context: context,
+              builder: (ctx) => AlertDialog(
+                backgroundColor: AppColors.surface,
+                title: const Text('تأیید نهایی'),
+                content: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text('برای حذف قطعی، کلمه «حذف» را تایپ کنید:'),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: confirmCtrl,
+                      decoration: const InputDecoration(hintText: 'حذف'),
+                      autofocus: true,
+                    ),
+                  ],
+                ),
+                actions: [
+                  TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('انصراف')),
+                  TextButton(
+                    onPressed: () {
+                      if (confirmCtrl.text.trim() == 'حذف') {
+                        Navigator.pop(ctx, true);
+                      }
+                    },
+                    child: const Text('حذف قطعی', style: TextStyle(color: AppColors.danger)),
+                  ),
+                ],
+              ),
+            );
+            if (step2 == true) {
               await _service.saveAll([]);
               _load();
               if (mounted) {
@@ -316,13 +501,13 @@ class _HomePageState extends State<HomePage> {
         _SettingsTile(
           icon: Icons.info_outline,
           title: 'درباره برنامه',
-          subtitle: 'نسخه ۱.۰.۰ - دفترچه مشتریان هوشمند',
+          subtitle: 'نسخه ۱.۳.۰ - دفترچه مشتریان هوشمند',
           onTap: () {
             showAboutDialog(
               context: context,
               applicationName: 'دفترچه مشتریان',
-              applicationVersion: '1.0.0',
-              applicationLegalese: 'مدیریت تماس و مشتریان',
+              applicationVersion: '1.3.0',
+              applicationLegalese: 'مدیریت تماس، پیامک و مشتریان',
             );
           },
         ),
