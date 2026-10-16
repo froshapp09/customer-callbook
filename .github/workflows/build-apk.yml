@@ -21,48 +21,7 @@ jobs:
           cache: true
 
       - name: Create Android platform
-        run: |
-          flutter create --project-name customer_callbook --org ir.apadanasleep --platforms=android .
-          mkdir -p assets/images assets/icons
-          touch assets/images/.gitkeep assets/icons/.gitkeep
-
-      - name: Fix Android config
-        run: |
-          set -e
-          find android -name "build.gradle*" -type f | while read f; do
-            sed -i -E 's/compileSdk(Version)?[[:space:]=]+[0-9]+/compileSdk = 35/g' "$f"
-            sed -i -E 's/targetSdk(Version)?[[:space:]=]+[0-9]+/targetSdk = 35/g' "$f"
-            if ! grep -q "compileSdk" "$f"; then
-              sed -i '/^android[[:space:]]*{/a\    compileSdk = 35' "$f" || true
-            fi
-          done
-          python3 << 'PY'
-          from pathlib import Path
-          import re
-          p = Path("android/app/src/main/AndroidManifest.xml")
-          t = p.read_text()
-          if "android.permission.INTERNET" not in t:
-              idx = t.find(">")
-              t = t[:idx+1] + """
-    <uses-permission android:name="android.permission.INTERNET"/>
-    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
-    <uses-permission android:name="android.permission.READ_PHONE_STATE"/>
-    <uses-permission android:name="android.permission.READ_CALL_LOG"/>
-    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW"/>""" + t[idx+1:]
-          if "usesCleartextTraffic" not in t:
-              t = t.replace("<application", '<application android:usesCleartextTraffic="true"', 1)
-          t = re.sub(r'android:label="[^"]*"', 'android:label="دفترچه مشتریان"', t)
-          p.write_text(t)
-          print("Manifest OK")
-          values = Path("android/app/src/main/res/values")
-          values.mkdir(parents=True, exist_ok=True)
-          (values / "strings.xml").write_text(
-              '<?xml version="1.0" encoding="utf-8"?>\n'
-              '<resources>\n'
-              '    <string name="app_name">دفترچه مشتریان</string>\n'
-              '</resources>\n'
-          )
-          PY
+        run: flutter create --project-name customer_callbook --org ir.apadanasleep --platforms=android .
 
       - name: Get dependencies
         run: flutter pub get
