@@ -1,46 +1,96 @@
 import 'package:flutter/material.dart';
 import 'package:customer_callbook/core/theme/app_colors.dart';
+import 'package:customer_callbook/data/models/customer.dart';
+import 'package:customer_callbook/data/services/customer_service.dart';
 
 class AddCustomerPage extends StatefulWidget {
+  final Customer? editCustomer;
   final String? initialPhone;
 
-  const AddCustomerPage({super.key, this.initialPhone});
+  const AddCustomerPage({super.key, this.editCustomer, this.initialPhone});
 
   @override
   State<AddCustomerPage> createState() => _AddCustomerPageState();
 }
 
 class _AddCustomerPageState extends State<AddCustomerPage> {
-  final _nameController = TextEditingController();
-  final _phoneController = TextEditingController();
-  final _noteController = TextEditingController();
+  final _nameCtrl = TextEditingController();
+  final _phoneCtrl = TextEditingController();
+  final _noteCtrl = TextEditingController();
   final _formKey = GlobalKey<FormState>();
+  final _service = CustomerService();
+  bool _saving = false;
+
+  bool get isEdit => widget.editCustomer != null;
 
   @override
   void initState() {
     super.initState();
-    if (widget.initialPhone != null) {
-      _phoneController.text = widget.initialPhone!;
+    if (widget.editCustomer != null) {
+      _nameCtrl.text = widget.editCustomer!.name;
+      _phoneCtrl.text = widget.editCustomer!.phone;
+      _noteCtrl.text = widget.editCustomer!.note ?? '';
+    } else if (widget.initialPhone != null) {
+      _phoneCtrl.text = widget.initialPhone!;
     }
   }
 
   @override
   void dispose() {
-    _nameController.dispose();
-    _phoneController.dispose();
-    _noteController.dispose();
+    _nameCtrl.dispose();
+    _phoneCtrl.dispose();
+    _noteCtrl.dispose();
     super.dispose();
+  }
+
+  Future<void> _save() async {
+    if (!_formKey.currentState!.validate()) return;
+    setState(() => _saving = true);
+
+    try {
+      if (isEdit) {
+        final updated = widget.editCustomer!.copyWith(
+          name: _nameCtrl.text.trim(),
+          phone: _phoneCtrl.text.trim(),
+          note: _noteCtrl.text.trim().isEmpty ? null : _noteCtrl.text.trim(),
+        );
+        await _service.update(updated);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('مشتری ویرایش شد'), backgroundColor: AppColors.success),
+          );
+          Navigator.pop(context, updated);
+        }
+      } else {
+        final customer = Customer(
+          name: _nameCtrl.text.trim(),
+          phone: _phoneCtrl.text.trim(),
+          note: _noteCtrl.text.trim().isEmpty ? null : _noteCtrl.text.trim(),
+        );
+        await _service.add(customer);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('مشتری ذخیره شد'), backgroundColor: AppColors.success),
+          );
+          Navigator.pop(context);
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('خطا: $e'), backgroundColor: AppColors.danger),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('افزودن مشتری جدید'),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.pop(context),
-        ),
+        title: Text(isEdit ? 'ویرایش مشتری' : 'افزودن مشتری جدید'),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
@@ -50,87 +100,54 @@ class _AddCustomerPageState extends State<AddCustomerPage> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               const SizedBox(height: 12),
-              Text(
-                'نام و نام خانوادگی',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: AppColors.primary,
-                    ),
-              ),
+              Text('نام و نام خانوادگی', style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppColors.primary)),
               const SizedBox(height: 8),
               TextFormField(
-                controller: _nameController,
+                controller: _nameCtrl,
+                textInputAction: TextInputAction.next,
                 decoration: const InputDecoration(
-                  hintText: 'نام کامل مشتری را وارد کنید',
+                  hintText: 'نام کامل مشتری',
                   prefixIcon: Icon(Icons.person_outline),
                 ),
-                validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return 'نام الزامی است';
-                  }
-                  return null;
-                },
+                validator: (v) => (v == null || v.trim().isEmpty) ? 'نام الزامی است' : null,
               ),
               const SizedBox(height: 20),
-              Text(
-                'شماره تلفن',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: AppColors.primary,
-                    ),
-              ),
+              Text('شماره تلفن', style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppColors.primary)),
               const SizedBox(height: 8),
               TextFormField(
-                controller: _phoneController,
+                controller: _phoneCtrl,
                 keyboardType: TextInputType.phone,
+                textInputAction: TextInputAction.next,
                 decoration: const InputDecoration(
                   hintText: '09xxxxxxxxx',
                   prefixIcon: Icon(Icons.phone_outlined),
                 ),
-                validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return 'شماره تلفن الزامی است';
-                  }
+                validator: (v) {
+                  if (v == null || v.trim().isEmpty) return 'شماره تلفن الزامی است';
+                  final digits = v.replaceAll(RegExp(r'\D'), '');
+                  if (digits.length < 10) return 'شماره معتبر نیست';
                   return null;
                 },
               ),
               const SizedBox(height: 20),
-              Text(
-                'یادداشت (اختیاری)',
-                style: Theme.of(context).textTheme.bodyMedium,
-              ),
+              Text('یادداشت (اختیاری)', style: Theme.of(context).textTheme.bodyMedium),
               const SizedBox(height: 8),
               TextFormField(
-                controller: _noteController,
+                controller: _noteCtrl,
                 maxLines: 3,
                 decoration: const InputDecoration(
-                  hintText: 'یادداشت خود را اینجا وارد کنید...',
+                  hintText: 'یادداشت...',
                   prefixIcon: Icon(Icons.notes_outlined),
                 ),
               ),
               const SizedBox(height: 32),
               ElevatedButton.icon(
-                onPressed: () {
-                  if (_formKey.currentState!.validate()) {
-                    // بعداً ذخیره در Hive اضافه می‌شود
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('مشتری با موفقیت ذخیره شد'),
-                        backgroundColor: AppColors.success,
-                      ),
-                    );
-                    Navigator.pop(context);
-                  }
-                },
-                icon: const Icon(Icons.check),
-                label: const Text('ذخیره'),
-                style: ElevatedButton.styleFrom(
-                  minimumSize: const Size.fromHeight(52),
-                ),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                'اطلاعات مشتری پس از ذخیره در لیست مشتریان قابل مشاهده است.',
-                style: Theme.of(context).textTheme.bodySmall,
-                textAlign: TextAlign.center,
+                onPressed: _saving ? null : _save,
+                icon: _saving
+                    ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.background))
+                    : const Icon(Icons.check),
+                label: Text(isEdit ? 'ذخیره تغییرات' : 'ذخیره'),
+                style: ElevatedButton.styleFrom(minimumSize: const Size.fromHeight(52)),
               ),
             ],
           ),

@@ -13,11 +13,9 @@ class AppTheme {
         primary: AppColors.primary,
         secondary: AppColors.primaryDark,
         surface: AppColors.surface,
-        background: AppColors.background,
         error: AppColors.danger,
         onPrimary: AppColors.background,
         onSurface: AppColors.textPrimary,
-        onBackground: AppColors.textPrimary,
       ),
       appBarTheme: AppBarTheme(
         backgroundColor: AppColors.background,
@@ -31,9 +29,6 @@ class AppTheme {
         iconTheme: const IconThemeData(color: AppColors.textPrimary),
       ),
       textTheme: TextTheme(
-        displayLarge: GoogleFonts.vazirmatn(color: AppColors.textPrimary),
-        displayMedium: GoogleFonts.vazirmatn(color: AppColors.textPrimary),
-        displaySmall: GoogleFonts.vazirmatn(color: AppColors.textPrimary),
         headlineMedium: GoogleFonts.vazirmatn(
           fontSize: 22,
           fontWeight: FontWeight.w600,
@@ -65,14 +60,6 @@ class AppTheme {
           fontSize: 15,
           fontWeight: FontWeight.w600,
           color: AppColors.background,
-        ),
-      ),
-      cardTheme: CardTheme(
-        color: AppColors.surface,
-        elevation: 0,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-          side: const BorderSide(color: AppColors.border, width: 1),
         ),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(

@@ -1,27 +1,106 @@
 import 'package:flutter/material.dart';
 import 'package:customer_callbook/core/theme/app_colors.dart';
+import 'package:customer_callbook/data/models/customer.dart';
+import 'package:customer_callbook/data/services/customer_service.dart';
+import 'package:customer_callbook/features/add_customer/presentation/pages/add_customer_page.dart';
+import 'package:url_launcher/url_launcher.dart';
 
-class CustomerDetailPage extends StatelessWidget {
-  final String name;
-  final String phone;
-  final int callCount;
+class CustomerDetailPage extends StatefulWidget {
+  final Customer customer;
+  const CustomerDetailPage({super.key, required this.customer});
 
-  const CustomerDetailPage({
-    super.key,
-    required this.name,
-    required this.phone,
-    required this.callCount,
-  });
+  @override
+  State<CustomerDetailPage> createState() => _CustomerDetailPageState();
+}
+
+class _CustomerDetailPageState extends State<CustomerDetailPage> {
+  late Customer _customer;
+  final _service = CustomerService();
+  final _noteCtrl = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _customer = widget.customer;
+    _noteCtrl.text = _customer.note ?? '';
+  }
+
+  @override
+  void dispose() {
+    _noteCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _call() async {
+    final uri = Uri(scheme: 'tel', path: _customer.phone);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri);
+      // ثبت تماس
+      final updated = _customer.copyWith(
+        callCount: _customer.callCount + 1,
+        lastCallAt: DateTime.now(),
+        firstCallAt: _customer.firstCallAt ?? DateTime.now(),
+      );
+      await _service.update(updated);
+      setState(() => _customer = updated);
+    } else {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('امکان برقراری تماس وجود ندارد')),
+        );
+      }
+    }
+  }
+
+  Future<void> _delete() async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        title: const Text('حذف مشتری؟'),
+        content: Text('«${_customer.name}» حذف شود؟'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('انصراف')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('حذف', style: TextStyle(color: AppColors.danger)),
+          ),
+        ],
+      ),
+    );
+    if (ok == true) {
+      await _service.delete(_customer.id);
+      if (mounted) Navigator.pop(context);
+    }
+  }
+
+  Future<void> _saveNote() async {
+    final updated = _customer.copyWith(note: _noteCtrl.text.trim());
+    await _service.update(updated);
+    setState(() => _customer = updated);
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('یادداشت ذخیره شد'), backgroundColor: AppColors.success),
+      );
+    }
+  }
+
+  String _fmt(DateTime? dt) {
+    if (dt == null) return '—';
+    return '${dt.year}/${dt.month.toString().padLeft(2, '0')}/${dt.day.toString().padLeft(2, '0')}';
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('جزئیات مشتری'),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.pop(context),
-        ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.delete_outline, color: AppColors.danger),
+            onPressed: _delete,
+          ),
+        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
@@ -32,32 +111,23 @@ class CustomerDetailPage extends StatelessWidget {
               radius: 40,
               backgroundColor: AppColors.surfaceLight,
               child: Text(
-                name.characters.first,
-                style: const TextStyle(
-                  color: AppColors.primary,
-                  fontSize: 32,
-                  fontWeight: FontWeight.w600,
-                ),
+                _customer.name.isNotEmpty ? _customer.name.characters.first : '?',
+                style: const TextStyle(color: AppColors.primary, fontSize: 32, fontWeight: FontWeight.w600),
               ),
             ),
             const SizedBox(height: 16),
-            Text(
-              name,
-              style: Theme.of(context).textTheme.headlineMedium,
-            ),
+            Text(_customer.name, style: Theme.of(context).textTheme.headlineMedium),
             const SizedBox(height: 6),
             Text(
-              phone,
-              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                    color: AppColors.textSecondary,
-                  ),
+              _customer.phone,
+              style: Theme.of(context).textTheme.bodyLarge?.copyWith(color: AppColors.textSecondary),
             ),
             const SizedBox(height: 24),
             Row(
               children: [
                 Expanded(
                   child: ElevatedButton.icon(
-                    onPressed: () {},
+                    onPressed: _call,
                     icon: const Icon(Icons.phone),
                     label: const Text('تماس'),
                   ),
@@ -65,7 +135,18 @@ class CustomerDetailPage extends StatelessWidget {
                 const SizedBox(width: 12),
                 Expanded(
                   child: OutlinedButton.icon(
-                    onPressed: () {},
+                    onPressed: () async {
+                      final result = await Navigator.push<Customer>(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => AddCustomerPage(editCustomer: _customer),
+                        ),
+                      );
+                      if (result != null) {
+                        setState(() => _customer = result);
+                        _noteCtrl.text = result.note ?? '';
+                      }
+                    },
                     icon: const Icon(Icons.edit_outlined),
                     label: const Text('ویرایش'),
                   ),
@@ -75,70 +156,34 @@ class CustomerDetailPage extends StatelessWidget {
             const SizedBox(height: 28),
             Row(
               children: [
-                Expanded(
-                  child: _InfoBox(title: 'تعداد تماس', value: '$callCount'),
-                ),
+                Expanded(child: _InfoBox(title: 'تعداد تماس', value: '${_customer.callCount}')),
                 const SizedBox(width: 12),
-                Expanded(
-                  child: _InfoBox(title: 'اولین تماس', value: '۱۴۰۳/۰۶/۱۲'),
-                ),
+                Expanded(child: _InfoBox(title: 'اولین تماس', value: _fmt(_customer.firstCallAt))),
                 const SizedBox(width: 12),
-                Expanded(
-                  child: _InfoBox(title: 'آخرین تماس', value: 'امروز'),
-                ),
+                Expanded(child: _InfoBox(title: 'آخرین تماس', value: _fmt(_customer.lastCallAt))),
               ],
             ),
             const SizedBox(height: 28),
             Align(
               alignment: Alignment.centerRight,
-              child: Text(
-                'تاریخچه تماس‌ها',
-                style: Theme.of(context).textTheme.titleMedium,
+              child: Text('یادداشت', style: Theme.of(context).textTheme.titleMedium),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _noteCtrl,
+              maxLines: 4,
+              decoration: const InputDecoration(
+                hintText: 'یادداشت خود را بنویسید...',
               ),
             ),
             const SizedBox(height: 12),
-            ...List.generate(4, (index) {
-              return Container(
-                margin: const EdgeInsets.only(bottom: 10),
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: AppColors.surface,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: AppColors.border),
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      index % 2 == 0 ? Icons.call_received : Icons.call_made,
-                      color: index % 2 == 0
-                          ? AppColors.success
-                          : AppColors.primary,
-                      size: 20,
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            index % 2 == 0 ? 'تماس ورودی' : 'تماس خروجی',
-                            style: Theme.of(context).textTheme.titleMedium,
-                          ),
-                          Text(
-                            '۱۴۰۳/۰۶/${12 - index}  |  ۱۴:۳۰',
-                            style: Theme.of(context).textTheme.bodySmall,
-                          ),
-                        ],
-                      ),
-                    ),
-                    Text(
-                      '۰${index + 2}:${30 + index * 5}',
-                      style: Theme.of(context).textTheme.bodyMedium,
-                    ),
-                  ],
-                ),
-              );
-            }),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton(
+                onPressed: _saveNote,
+                child: const Text('ذخیره یادداشت'),
+              ),
+            ),
           ],
         ),
       ),
@@ -149,7 +194,6 @@ class CustomerDetailPage extends StatelessWidget {
 class _InfoBox extends StatelessWidget {
   final String title;
   final String value;
-
   const _InfoBox({required this.title, required this.value});
 
   @override
@@ -163,20 +207,9 @@ class _InfoBox extends StatelessWidget {
       ),
       child: Column(
         children: [
-          Text(
-            value,
-            style: const TextStyle(
-              color: AppColors.primary,
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
+          Text(value, style: const TextStyle(color: AppColors.primary, fontSize: 15, fontWeight: FontWeight.w600)),
           const SizedBox(height: 4),
-          Text(
-            title,
-            style: Theme.of(context).textTheme.bodySmall,
-            textAlign: TextAlign.center,
-          ),
+          Text(title, style: Theme.of(context).textTheme.bodySmall, textAlign: TextAlign.center),
         ],
       ),
     );

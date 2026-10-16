@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:uuid/uuid.dart';
 
 class Customer {
@@ -62,18 +63,18 @@ class Customer {
 
   factory Customer.fromMap(Map<String, dynamic> map) {
     return Customer(
-      id: map['id'],
-      name: map['name'],
-      phone: map['phone'],
+      id: map['id'] ?? const Uuid().v4(),
+      name: map['name'] ?? '',
+      phone: map['phone'] ?? '',
       note: map['note'],
       callCount: map['callCount'] ?? 0,
-      firstCallAt: map['firstCallAt'] != null
-          ? DateTime.parse(map['firstCallAt'])
-          : null,
-      lastCallAt:
-          map['lastCallAt'] != null ? DateTime.parse(map['lastCallAt']) : null,
+      firstCallAt: map['firstCallAt'] != null ? DateTime.tryParse(map['firstCallAt']) : null,
+      lastCallAt: map['lastCallAt'] != null ? DateTime.tryParse(map['lastCallAt']) : null,
       isFavorite: map['isFavorite'] ?? false,
-      createdAt: DateTime.parse(map['createdAt']),
+      createdAt: map['createdAt'] != null ? DateTime.tryParse(map['createdAt']) ?? DateTime.now() : DateTime.now(),
     );
   }
+
+  String toJson() => jsonEncode(toMap());
+  factory Customer.fromJson(String source) => Customer.fromMap(jsonDecode(source));
 }
