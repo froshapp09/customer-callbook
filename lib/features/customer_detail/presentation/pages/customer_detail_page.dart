@@ -69,42 +69,22 @@ class _CustomerDetailPageState extends State<CustomerDetailPage> {
   }
 
   Future<void> _delete() async {
-    // مرحله ۱
-    final step1 = await showDialog<bool>(
+    final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: AppColors.surface,
         title: const Text('حذف مشتری؟'),
-        content: Text('«${_customer.name}» حذف شود؟
-این عمل قابل بازگشت نیست.'),
+        content: Text('«${_customer.name}» حذف شود؟'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('انصراف')),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('ادامه', style: TextStyle(color: AppColors.warning)),
+            child: const Text('حذف', style: TextStyle(color: AppColors.danger)),
           ),
         ],
       ),
     );
-    if (step1 != true || !mounted) return;
-
-    // مرحله ۲
-    final step2 = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: AppColors.surface,
-        title: const Text('تأیید نهایی'),
-        content: Text('مطمئن هستید «${_customer.name}» برای همیشه حذف شود؟'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('انصراف')),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('حذف قطعی', style: TextStyle(color: AppColors.danger)),
-          ),
-        ],
-      ),
-    );
-    if (step2 == true) {
+    if (ok == true) {
       await _service.delete(_customer.id);
       if (mounted) Navigator.pop(context);
     }
