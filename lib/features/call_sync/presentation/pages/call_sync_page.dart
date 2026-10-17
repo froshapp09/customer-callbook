@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:call_log/call_log.dart';
+import 'package:flutter/services.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:customer_callbook/core/theme/app_colors.dart';
 import 'package:customer_callbook/data/services/customer_service.dart';
@@ -14,8 +14,9 @@ class CallSyncPage extends StatefulWidget {
 }
 
 class _CallSyncPageState extends State<CallSyncPage> {
+  static const _channel = MethodChannel('ir.apadanasleep.customer_callbook/call_log');
   final _service = CustomerService();
-  List<CallLogEntry> _entries = [];
+  List<Map<String, dynamic>> _entries = [];
   bool _loading = true;
   String? _error;
 
@@ -32,69 +33,63 @@ class _CallSyncPageState extends State<CallSyncPage> {
     });
 
     try {
-      // مجوز تاریخچه تماس
-      var status = await Permission.phone.status;
-      if (!status.isGranted) {
-        status = await Permission.phone.request();
-      }
-
-      // بعضی گوشی‌ها call log را جدا می‌خواهند
-      final logsStatus = await Permission.phone.request();
-      if (!logsStatus.isGranted) {
+      final phone = await Permission.phone.request();
+      if (!phone.isGranted) {
         setState(() {
           _loading = false;
-          _error = 'مجوز تلفن / تاریخچه تماس داده نشده.\nاز تنظیمات برنامه → مجوزها فعال کنید.';
+          _error = 'مجوز تلفن داده نشده.\nتنظیمات → برنامه‌ها → دفترچه مشتریان → مجوزها → تلفن';
         });
         return;
       }
 
-      final now = DateTime.now();
-      final startOfDay = DateTime(now.year, now.month, now.day);
-      final from = startOfDay.millisecondsSinceEpoch;
-
-      // تماس‌های امروز + دیروز برای اطمینان
-      final iterable = await CallLog.query(
-        dateFrom: from - (24 * 60 * 60 * 1000),
-      );
-
-      final list = iterable.toList();
-      // فقط ورودی و ازدست‌رفته اولویت
-      list.sort((a, b) => (b.timestamp ?? 0).compareTo(a.timestamp ?? 0));
-
+      final result = await _channel.invokeMethod<List>('getRecentCalls', {'days': 2});
+      final list = <Map<String, dynamic>>[];
+      if (result != null) {
+        for (final item in result) {
+          if (item is Map) {
+            list.add(Map<String, dynamic>.from(item));
+          }
+        }
+      }
       setState(() {
         _entries = list;
         _loading = false;
       });
+    } on PlatformException catch (e) {
+      setState(() {
+        _loading = false;
+        _error = e.message ?? 'خطا در خواندن تاریخچه تماس';
+      });
     } catch (e) {
       setState(() {
         _loading = false;
-        _error = 'خطا در خواندن تاریخچه تماس:\n$e\n\nمجوز «تلفن» و در صورت وجود «تاریخچه تماس» را در تنظیمات گوشی بدهید.';
+        _error = 'خطا: $e\n\nاگر مجوز تلفن را داده‌اید، یک‌بار برنامه را ببندید و دوباره باز کنید.';
       });
     }
   }
 
-  String _typeLabel(CallType? t) {
+  String _typeLabel(String? t) {
     switch (t) {
-      case CallType.incoming:
+      case 'incoming':
         return 'ورودی';
-      case CallType.outgoing:
+      case 'outgoing':
         return 'خروجی';
-      case CallType.missed:
+      case 'missed':
         return 'از دست رفته';
-      case CallType.rejected:
+      case 'rejected':
         return 'رد شده';
       default:
         return 'تماس';
     }
   }
 
-  Color _typeColor(CallType? t) {
+  Color _typeColor(String? t) {
     switch (t) {
-      case CallType.incoming:
+      case 'incoming':
         return AppColors.success;
-      case CallType.outgoing:
+      case 'outgoing':
         return AppColors.info;
-      case CallType.missed:
+      case 'missed':
         return AppColors.danger;
       default:
         return AppColors.textMuted;
@@ -114,56 +109,41 @@ class _CallSyncPageState extends State<CallSyncPage> {
     return '${dt.month}/${dt.day} $h:$m';
   }
 
-  Future<void> _addOrUpdate(CallLogEntry e) async {
-    final phone = (e.number ?? '').trim();
+  Future<void> _addOrUpdate(Map<String, dynamic> e) async {
+    final phone = (e['number'] ?? '').toString().trim();
     if (phone.isEmpty) return;
 
     final existing = await _service.findByPhone(phone);
     if (existing != null) {
-      // ثبت تماس
       await _service.recordCall(phone, name: existing.name);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('تماس برای «${existing.name}» ثبت شد'),
-            backgroundColor: AppColors.success,
-          ),
+          SnackBar(content: Text('تماس برای «${existing.name}» ثبت شد'), backgroundColor: AppColors.success),
         );
       }
     } else {
-      // نام از call log یا مخاطبین
-      String name = (e.name ?? '').trim();
+      String name = (e['name'] ?? '').toString().trim();
       if (name.isEmpty || name == phone) {
         name = await _service.lookupNameFromDeviceContacts(phone) ?? '';
       }
-
       if (name.isEmpty) {
-        // برو صفحه افزودن با شماره پر شده
         if (!mounted) return;
         await Navigator.push(
           context,
-          MaterialPageRoute(
-            builder: (_) => AddCustomerPage(initialPhone: phone),
-          ),
+          MaterialPageRoute(builder: (_) => AddCustomerPage(initialPhone: phone)),
         );
       } else {
+        final ts = e['timestamp'] as int?;
         await _service.add(Customer(
           name: name,
           phone: phone,
           callCount: 1,
-          firstCallAt: e.timestamp != null
-              ? DateTime.fromMillisecondsSinceEpoch(e.timestamp!)
-              : DateTime.now(),
-          lastCallAt: e.timestamp != null
-              ? DateTime.fromMillisecondsSinceEpoch(e.timestamp!)
-              : DateTime.now(),
+          firstCallAt: ts != null ? DateTime.fromMillisecondsSinceEpoch(ts) : DateTime.now(),
+          lastCallAt: ts != null ? DateTime.fromMillisecondsSinceEpoch(ts) : DateTime.now(),
         ));
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('«$name» اضافه شد'),
-              backgroundColor: AppColors.success,
-            ),
+            SnackBar(content: Text('«$name» اضافه شد'), backgroundColor: AppColors.success),
           );
         }
       }
@@ -175,38 +155,30 @@ class _CallSyncPageState extends State<CallSyncPage> {
     int added = 0;
     final seen = <String>{};
     for (final e in _entries) {
-      final phone = (e.number ?? '').trim();
+      final phone = (e['number'] ?? '').toString().trim();
       if (phone.isEmpty) continue;
       final key = phone.replaceAll(RegExp(r'\D'), '');
       if (seen.contains(key)) continue;
       seen.add(key);
+      if (await _service.findByPhone(phone) != null) continue;
 
-      final existing = await _service.findByPhone(phone);
-      if (existing != null) continue;
-
-      String name = (e.name ?? '').trim();
+      String name = (e['name'] ?? '').toString().trim();
       if (name.isEmpty || name == phone) {
         name = await _service.lookupNameFromDeviceContacts(phone) ?? phone;
       }
+      final ts = e['timestamp'] as int?;
       await _service.add(Customer(
         name: name,
         phone: phone,
         callCount: 1,
-        firstCallAt: e.timestamp != null
-            ? DateTime.fromMillisecondsSinceEpoch(e.timestamp!)
-            : DateTime.now(),
-        lastCallAt: e.timestamp != null
-            ? DateTime.fromMillisecondsSinceEpoch(e.timestamp!)
-            : DateTime.now(),
+        firstCallAt: ts != null ? DateTime.fromMillisecondsSinceEpoch(ts) : DateTime.now(),
+        lastCallAt: ts != null ? DateTime.fromMillisecondsSinceEpoch(ts) : DateTime.now(),
       ));
       added++;
     }
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('$added مشتری جدید اضافه شد'),
-          backgroundColor: AppColors.success,
-        ),
+        SnackBar(content: Text('$added مشتری جدید اضافه شد'), backgroundColor: AppColors.success),
       );
     }
     _load();
@@ -219,10 +191,7 @@ class _CallSyncPageState extends State<CallSyncPage> {
         title: const Text('تماس‌های گوشی'),
         actions: [
           if (_entries.isNotEmpty)
-            TextButton(
-              onPressed: _addAllMissing,
-              child: const Text('افزودن همه جدید'),
-            ),
+            TextButton(onPressed: _addAllMissing, child: const Text('افزودن همه')),
           IconButton(icon: const Icon(Icons.refresh), onPressed: _load),
         ],
       ),
@@ -239,28 +208,23 @@ class _CallSyncPageState extends State<CallSyncPage> {
                         const SizedBox(height: 16),
                         Text(_error!, textAlign: TextAlign.center, style: const TextStyle(color: AppColors.textSecondary)),
                         const SizedBox(height: 20),
-                        ElevatedButton(
-                          onPressed: () => openAppSettings(),
-                          child: const Text('باز کردن تنظیمات مجوزها'),
-                        ),
-                        const SizedBox(height: 12),
+                        ElevatedButton(onPressed: () => openAppSettings(), child: const Text('تنظیمات مجوزها')),
                         TextButton(onPressed: _load, child: const Text('تلاش مجدد')),
                       ],
                     ),
                   ),
                 )
               : _entries.isEmpty
-                  ? const Center(
-                      child: Text('تماس اخیری پیدا نشد', style: TextStyle(color: AppColors.textMuted)),
-                    )
+                  ? const Center(child: Text('تماس اخیری پیدا نشد', style: TextStyle(color: AppColors.textMuted)))
                   : ListView.builder(
                       padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
                       itemCount: _entries.length,
                       itemBuilder: (context, index) {
                         final e = _entries[index];
-                        final phone = e.number ?? '—';
-                        final name = (e.name != null && e.name!.trim().isNotEmpty) ? e.name!.trim() : null;
-
+                        final phone = (e['number'] ?? '—').toString();
+                        final name = (e['name'] as String?)?.trim();
+                        final hasName = name != null && name.isNotEmpty && name != phone;
+                        final type = e['type'] as String?;
                         return Padding(
                           padding: const EdgeInsets.only(bottom: 10),
                           child: Container(
@@ -272,30 +236,22 @@ class _CallSyncPageState extends State<CallSyncPage> {
                             ),
                             child: Row(
                               children: [
-                                Icon(Icons.phone_callback, color: _typeColor(e.callType), size: 22),
+                                Icon(Icons.phone_callback, color: _typeColor(type), size: 22),
                                 const SizedBox(width: 12),
                                 Expanded(
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
+                                      Text(hasName ? name : phone, style: Theme.of(context).textTheme.titleMedium),
+                                      if (hasName) Text(phone, style: Theme.of(context).textTheme.bodySmall),
                                       Text(
-                                        name ?? phone,
-                                        style: Theme.of(context).textTheme.titleMedium,
-                                      ),
-                                      if (name != null)
-                                        Text(phone, style: Theme.of(context).textTheme.bodySmall),
-                                      const SizedBox(height: 2),
-                                      Text(
-                                        '${_typeLabel(e.callType)}  •  ${_timeLabel(e.timestamp)}',
-                                        style: TextStyle(color: _typeColor(e.callType), fontSize: 12),
+                                        '${_typeLabel(type)}  •  ${_timeLabel(e['timestamp'] as int?)}',
+                                        style: TextStyle(color: _typeColor(type), fontSize: 12),
                                       ),
                                     ],
                                   ),
                                 ),
-                                TextButton(
-                                  onPressed: () => _addOrUpdate(e),
-                                  child: const Text('افزودن'),
-                                ),
+                                TextButton(onPressed: () => _addOrUpdate(e), child: const Text('افزودن')),
                               ],
                             ),
                           ),
