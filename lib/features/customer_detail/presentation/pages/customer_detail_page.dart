@@ -42,29 +42,36 @@ class _CustomerDetailPageState extends State<CustomerDetailPage> {
       );
       await _service.update(updated);
       setState(() => _customer = updated);
-    } else {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('امکان برقراری تماس وجود ندارد')),
-        );
-      }
+    } else if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('امکان برقراری تماس وجود ندارد')),
+      );
     }
   }
 
-  Future<void> _sms({String? body}) async {
-    final uri = Uri(
-      scheme: 'sms',
-      path: _customer.phone,
-      queryParameters: body != null && body.isNotEmpty ? {'body': body} : null,
-    );
+  Future<void> _sms() async {
+    final uri = Uri(scheme: 'sms', path: _customer.phone);
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri);
-    } else {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('امکان ارسال پیامک وجود ندارد')),
-        );
-      }
+    } else if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('امکان ارسال پیامک وجود ندارد')),
+      );
+    }
+  }
+
+  Future<void> _edit() async {
+    final result = await Navigator.push<Customer>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => AddCustomerPage(editCustomer: _customer),
+      ),
+    );
+    if (result != null) {
+      setState(() {
+        _customer = result;
+        _noteCtrl.text = result.note ?? '';
+      });
     }
   }
 
@@ -128,7 +135,11 @@ class _CustomerDetailPageState extends State<CustomerDetailPage> {
               backgroundColor: AppColors.surfaceLight,
               child: Text(
                 _customer.name.isNotEmpty ? _customer.name.characters.first : '?',
-                style: const TextStyle(color: AppColors.primary, fontSize: 32, fontWeight: FontWeight.w600),
+                style: const TextStyle(
+                  color: AppColors.primary,
+                  fontSize: 32,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
             const SizedBox(height: 16),
@@ -138,48 +149,40 @@ class _CustomerDetailPageState extends State<CustomerDetailPage> {
               _customer.phone,
               style: Theme.of(context).textTheme.bodyLarge?.copyWith(color: AppColors.textSecondary),
             ),
-            const SizedBox(height: 24),
-            Row(
-              children: [
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: _call,
-                    icon: const Icon(Icons.phone, size: 18),
-                    label: const Text('تماس'),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: () => _sms(),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF3B82F6),
-                    ),
-                    icon: const Icon(Icons.sms_outlined, size: 18),
-                    label: const Text('پیامک'),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: () async {
-                      final result = await Navigator.push<Customer>(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => AddCustomerPage(editCustomer: _customer),
-                        ),
-                      );
-                      if (result != null) {
-                        setState(() => _customer = result);
-                        _noteCtrl.text = result.note ?? '';
-                      }
-                    },
-                    icon: const Icon(Icons.edit_outlined, size: 18),
-                    label: const Text('ویرایش'),
-                  ),
-                ),
-              ],
+            const SizedBox(height: 28),
+
+            // دکمه‌ها — عمودی تا متن نشکند
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: ElevatedButton.icon(
+                onPressed: _call,
+                icon: const Icon(Icons.phone),
+                label: const Text('تماس'),
+              ),
             ),
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: ElevatedButton.icon(
+                onPressed: _sms,
+                style: ElevatedButton.styleFrom(backgroundColor: AppColors.info),
+                icon: const Icon(Icons.sms_outlined),
+                label: const Text('پیامک'),
+              ),
+            ),
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: OutlinedButton.icon(
+                onPressed: _edit,
+                icon: const Icon(Icons.edit_outlined),
+                label: const Text('ویرایش'),
+              ),
+            ),
+
             const SizedBox(height: 28),
             Row(
               children: [
@@ -199,9 +202,7 @@ class _CustomerDetailPageState extends State<CustomerDetailPage> {
             TextField(
               controller: _noteCtrl,
               maxLines: 4,
-              decoration: const InputDecoration(
-                hintText: 'یادداشت خود را بنویسید...',
-              ),
+              decoration: const InputDecoration(hintText: 'یادداشت خود را بنویسید...'),
             ),
             const SizedBox(height: 12),
             SizedBox(
@@ -234,7 +235,11 @@ class _InfoBox extends StatelessWidget {
       ),
       child: Column(
         children: [
-          Text(value, style: const TextStyle(color: AppColors.primary, fontSize: 15, fontWeight: FontWeight.w600)),
+          Text(
+            value,
+            style: const TextStyle(color: AppColors.primary, fontSize: 15, fontWeight: FontWeight.w600),
+            textAlign: TextAlign.center,
+          ),
           const SizedBox(height: 4),
           Text(title, style: Theme.of(context).textTheme.bodySmall, textAlign: TextAlign.center),
         ],

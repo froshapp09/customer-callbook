@@ -194,6 +194,20 @@ class _PhonebookPageState extends State<PhonebookPage> {
                                         ),
                                       ),
                                     ),
+                                    IconButton(
+                                      icon: const Icon(Icons.info_outline, color: AppColors.textMuted, size: 22),
+                                      tooltip: 'جزئیات',
+                                      onPressed: () async {
+                                        await Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (_) => CustomerDetailPage(customer: c),
+                                          ),
+                                        );
+                                        _load();
+                                        widget.onChanged?.call();
+                                      },
+                                    ),
                                   ],
                                 ),
                               ),
