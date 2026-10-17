@@ -5,6 +5,7 @@ import 'package:customer_callbook/data/services/customer_service.dart';
 import 'package:customer_callbook/features/phonebook/presentation/pages/phonebook_page.dart';
 import 'package:customer_callbook/features/add_customer/presentation/pages/add_customer_page.dart';
 import 'package:customer_callbook/features/customer_detail/presentation/pages/customer_detail_page.dart';
+import 'package:customer_callbook/features/call_sync/presentation/pages/call_sync_page.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:customer_callbook/services/call_listener_service.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -167,7 +168,23 @@ class _HomePageState extends State<HomePage> {
           ),
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 24, 20, 12),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+              child: OutlinedButton.icon(
+                onPressed: () async {
+                  await Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const CallSyncPage()),
+                  );
+                  _load();
+                },
+                icon: const Icon(Icons.phone_android),
+                label: const Text('دریافت تماس‌های امروز از گوشی'),
+              ),
+            ),
+          ),
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
               child: Text('آخرین تماس‌ها', style: Theme.of(context).textTheme.titleMedium),
             ),
           ),
@@ -348,6 +365,21 @@ class _HomePageState extends State<HomePage> {
         ),
         const SizedBox(height: 12),
 
+        // همگام‌سازی تاریخچه تماس گوشی
+        _SettingsTile(
+          icon: Icons.sync,
+          title: 'تماس‌های گوشی (افزودن دستی)',
+          subtitle: 'خواندن تاریخچه تماس و افزودن به مشتریان',
+          onTap: () async {
+            await Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const CallSyncPage()),
+            );
+            _load();
+          },
+        ),
+        const SizedBox(height: 12),
+
         // خروجی لیست برای پنل پیامکی
         _SettingsTile(
           icon: Icons.upload_file_outlined,
@@ -514,12 +546,12 @@ class _HomePageState extends State<HomePage> {
         _SettingsTile(
           icon: Icons.info_outline,
           title: 'درباره برنامه',
-          subtitle: 'نسخه ۱.۳.۰ - دفترچه مشتریان هوشمند',
+          subtitle: 'نسخه ۱.۴.۰ - دفترچه مشتریان هوشمند',
           onTap: () {
             showAboutDialog(
               context: context,
               applicationName: 'دفترچه مشتریان',
-              applicationVersion: '1.3.0',
+              applicationVersion: '1.4.0',
               applicationLegalese: 'مدیریت تماس، پیامک و مشتریان',
             );
           },
