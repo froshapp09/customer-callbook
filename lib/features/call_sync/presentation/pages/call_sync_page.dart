@@ -191,15 +191,15 @@ class _CallSyncPageState extends State<CallSyncPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('تماس‌های گوشی'),
+        title: Text('تماس‌های گوشی'),
         actions: [
           if (_entries.isNotEmpty)
-            TextButton(onPressed: _addAllMissing, child: const Text('افزودن همه')),
-          IconButton(icon: const Icon(Icons.refresh), onPressed: _load),
+            TextButton(onPressed: _addAllMissing, child: Text('افزودن همه')),
+          IconButton(icon: Icon(Icons.refresh), onPressed: _load),
         ],
       ),
       body: _loading
-          ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
+          ? Center(child: CircularProgressIndicator(color: AppColors.primary))
           : _error != null
               ? Center(
                   child: Padding(
@@ -207,9 +207,9 @@ class _CallSyncPageState extends State<CallSyncPage> {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(Icons.phone_disabled, size: 48, color: AppColors.textMuted),
+                        Icon(Icons.phone_disabled, size: 48, color: AppColors.textMuted),
                         const SizedBox(height: 16),
-                        Text(_error!, textAlign: TextAlign.center, style: const TextStyle(color: AppColors.textSecondary)),
+                        Text(_error!, textAlign: TextAlign.center, style: TextStyle(color: AppColors.textSecondary)),
                         const SizedBox(height: 20),
                         ElevatedButton(onPressed: () => openAppSettings(), child: const Text('تنظیمات مجوزها')),
                         TextButton(onPressed: _load, child: const Text('تلاش مجدد')),
@@ -218,7 +218,7 @@ class _CallSyncPageState extends State<CallSyncPage> {
                   ),
                 )
               : _entries.isEmpty
-                  ? const Center(child: Text('تماس اخیری پیدا نشد', style: TextStyle(color: AppColors.textMuted)))
+                  ? Center(child: Text('تماس اخیری پیدا نشد', style: TextStyle(color: AppColors.textMuted)))
                   : ListView.builder(
                       padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
                       itemCount: _entries.length,

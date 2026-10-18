@@ -136,13 +136,13 @@ class _PhonebookPageState extends State<PhonebookPage> {
         ),
         Expanded(
           child: _loading
-              ? const Center(child: CircularProgressIndicator())
+              ? Center(child: CircularProgressIndicator())
               : _filtered.isEmpty
                   ? Center(
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Icon(Icons.person_off_outlined, size: 48, color: AppColors.textMuted),
+                          Icon(Icons.person_off_outlined, size: 48, color: AppColors.textMuted),
                           const SizedBox(height: 12),
                           Text('مشتری‌ای نیست', style: Theme.of(context).textTheme.bodyMedium),
                           TextButton(
@@ -189,7 +189,7 @@ class _PhonebookPageState extends State<PhonebookPage> {
                                     // دکمه تماس سریع
                                     IconButton(
                                       onPressed: () => _dial(c.phone),
-                                      icon: const Icon(Icons.phone, color: AppColors.accent),
+                                      icon: Icon(Icons.phone, color: AppColors.accent),
                                       style: IconButton.styleFrom(backgroundColor: AppColors.accent.withOpacity(0.12)),
                                     ),
                                     const SizedBox(width: 8),
@@ -200,7 +200,7 @@ class _PhonebookPageState extends State<PhonebookPage> {
                                           Row(
                                             mainAxisAlignment: MainAxisAlignment.end,
                                             children: [
-                                              if (c.favorite) const Icon(Icons.star, size: 14, color: AppColors.warning),
+                                              if (c.favorite) Icon(Icons.star, size: 14, color: AppColors.warning),
                                               if (c.favorite) const SizedBox(width: 4),
                                               Flexible(child: Text(c.name, style: Theme.of(context).textTheme.titleMedium)),
                                             ],
@@ -223,7 +223,7 @@ class _PhonebookPageState extends State<PhonebookPage> {
                                       backgroundColor: _avatarColor(c.name),
                                       child: Text(
                                         c.name.isNotEmpty ? c.name.characters.first : '?',
-                                        style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 18, color: AppColors.textPrimary),
+                                        style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18, color: AppColors.textPrimary),
                                       ),
                                     ),
                                   ],

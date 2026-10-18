@@ -48,6 +48,7 @@ class AppColors {
   static Color get primary => isDark ? AppColorsDark.primary : AppColorsLight.primary;
   static Color get primaryDark => isDark ? AppColorsDark.primaryDark : AppColorsLight.primaryDark;
   static Color get accent => isDark ? AppColorsDark.accent : AppColorsLight.accent;
+  static Color get success => accent;
   static Color get textPrimary => isDark ? AppColorsDark.textPrimary : AppColorsLight.textPrimary;
   static Color get textSecondary => isDark ? AppColorsDark.textSecondary : AppColorsLight.textSecondary;
   static Color get textMuted => isDark ? AppColorsDark.textMuted : AppColorsLight.textMuted;

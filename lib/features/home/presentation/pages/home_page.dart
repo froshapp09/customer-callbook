@@ -110,7 +110,7 @@ class _HomePageState extends State<HomePage> {
                 await Navigator.push(context, MaterialPageRoute(builder: (_) => const AddCustomerPage()));
                 _load();
               },
-              child: const Icon(Icons.person_add_alt_1),
+              child: Icon(Icons.person_add_alt_1),
             )
           : null,
     );
@@ -186,10 +186,10 @@ class _CallsTab extends StatelessWidget {
                     width: double.infinity,
                     child: OutlinedButton.icon(
                       onPressed: onSync,
-                      icon: const Icon(Icons.phone_android, color: AppColors.primary),
-                      label: const Text('دریافت تماس‌های گوشی', style: TextStyle(color: AppColors.primary)),
+                      icon: Icon(Icons.phone_android, color: AppColors.primary),
+                      label: Text('دریافت تماس‌های گوشی', style: TextStyle(color: AppColors.primary)),
                       style: OutlinedButton.styleFrom(
-                        side: const BorderSide(color: AppColors.primary),
+                        side: BorderSide(color: AppColors.primary),
                         backgroundColor: AppColors.surface,
                       ),
                     ),
@@ -314,7 +314,7 @@ class _StatCard extends StatelessWidget {
         children: [
           Icon(icon, size: 18, color: AppColors.primary),
           const SizedBox(height: 6),
-          Text(value, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: AppColors.primary)),
+          Text(value, style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: AppColors.primary)),
           Text(label, style: Theme.of(context).textTheme.bodySmall, textAlign: TextAlign.center),
         ],
       ),
@@ -364,7 +364,7 @@ class _SettingsTab extends StatelessWidget {
             await Share.share(buf.toString(), subject: 'لیست مشتریان');
           },
         ),
-        _tile(context, Icons.info_outline, 'درباره', 'نسخه ۱.۶.۰ — دفترچه مشتریان', null),
+        _tile(context, Icons.info_outline, 'درباره', 'نسخه ۱.۹.۰ — دفترچه مشتریان', null),
       ],
     );
   }
@@ -399,6 +399,45 @@ class _SettingsTab extends StatelessWidget {
           trailing: onTap != null ? Icon(Icons.chevron_left, color: AppColors.textMuted) : null,
         ),
       ),
+    );
+  }
+}
+
+class _ThemeTile extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final theme = ThemeController.instance;
+    return AnimatedBuilder(
+      animation: theme,
+      builder: (context, _) {
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          decoration: BoxDecoration(
+            color: AppColors.surfaceElevated,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(color: AppColors.shadow, blurRadius: 12, offset: const Offset(0, 4)),
+            ],
+          ),
+          child: SwitchListTile(
+            value: theme.isDark,
+            onChanged: (v) => theme.setDark(v),
+            title: Text(
+              theme.isDark ? 'حالت تیره' : 'حالت روشن',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            subtitle: Text(
+              theme.isDark ? 'پس‌زمینه تیره و ملایم' : 'پس‌زمینه روشن متعادل',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            secondary: Icon(
+              theme.isDark ? Icons.dark_mode_rounded : Icons.light_mode_rounded,
+              color: AppColors.primary,
+              size: 28,
+            ),
+          ),
+        );
+      },
     );
   }
 }

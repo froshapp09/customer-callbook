@@ -90,11 +90,11 @@ class _CustomerDetailPageState extends State<CustomerDetailPage> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('حذف مشتری؟'),
+        title: Text('حذف مشتری؟'),
         content: Text('«${_customer.name}» حذف شود؟'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('انصراف')),
-          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('حذف', style: TextStyle(color: AppColors.danger))),
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text('انصراف')),
+          TextButton(onPressed: () => Navigator.pop(ctx, true), child: Text('حذف', style: TextStyle(color: AppColors.danger))),
         ],
       ),
     );
@@ -110,7 +110,7 @@ class _CustomerDetailPageState extends State<CustomerDetailPage> {
     setState(() => _customer = u);
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('یادداشت ذخیره شد'), backgroundColor: AppColors.success),
+        SnackBar(content: Text('یادداشت ذخیره شد'), backgroundColor: AppColors.success),
       );
     }
   }
@@ -147,7 +147,7 @@ class _CustomerDetailPageState extends State<CustomerDetailPage> {
             onPressed: _toggleFavorite,
             tooltip: 'ویژه',
           ),
-          IconButton(icon: const Icon(Icons.delete_outline, color: AppColors.danger), onPressed: _delete),
+          IconButton(icon: Icon(Icons.delete_outline, color: AppColors.danger), onPressed: _delete),
         ],
       ),
       body: SingleChildScrollView(
@@ -159,7 +159,7 @@ class _CustomerDetailPageState extends State<CustomerDetailPage> {
               backgroundColor: _avatarColor(_customer.name),
               child: Text(
                 _customer.name.isNotEmpty ? _customer.name.characters.first : '?',
-                style: const TextStyle(fontSize: 36, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+                style: TextStyle(fontSize: 36, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
               ),
             ),
             const SizedBox(height: 14),
@@ -167,7 +167,7 @@ class _CustomerDetailPageState extends State<CustomerDetailPage> {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 if (_customer.favorite) ...[
-                  const Icon(Icons.star, color: AppColors.warning, size: 18),
+                  Icon(Icons.star, color: AppColors.warning, size: 18),
                   const SizedBox(width: 4),
                 ],
                 Flexible(child: Text(_customer.name, style: Theme.of(context).textTheme.headlineMedium, textAlign: TextAlign.center)),
@@ -180,7 +180,7 @@ class _CustomerDetailPageState extends State<CustomerDetailPage> {
               children: [
                 _Chip(label: _customer.tag, color: AppColors.primary),
                 _Chip(label: typeLabel, color: _mobile ? AppColors.accent : AppColors.textMuted),
-                if (isVip) const _Chip(label: 'پرتردد', color: AppColors.warning),
+                if (isVip) _Chip(label: 'پرتردد', color: AppColors.warning),
               ],
             ),
             const SizedBox(height: 10),
@@ -196,7 +196,7 @@ class _CustomerDetailPageState extends State<CustomerDetailPage> {
                   ),
                   const SizedBox(width: 6),
                   IconButton(
-                    icon: const Icon(Icons.copy, size: 18, color: AppColors.textMuted),
+                    icon: Icon(Icons.copy, size: 18, color: AppColors.textMuted),
                     onPressed: _copy,
                     tooltip: 'کپی شماره',
                   ),
@@ -223,7 +223,7 @@ class _CustomerDetailPageState extends State<CustomerDetailPage> {
                   color: AppColors.surface,
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: const Text(
+                child: Text(
                   'این شماره موبایل نیست؛ پیامک و واتساپ فقط برای موبایل فعال است.',
                   textAlign: TextAlign.center,
                   style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
@@ -298,7 +298,7 @@ class _InfoCol extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        Text(value, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: AppColors.primary), textAlign: TextAlign.center),
+        Text(value, style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: AppColors.primary), textAlign: TextAlign.center),
         const SizedBox(height: 4),
         Text(title, style: Theme.of(context).textTheme.bodySmall, textAlign: TextAlign.center),
       ],
