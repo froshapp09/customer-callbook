@@ -6,7 +6,7 @@ class AppTheme {
   static ThemeData theme(bool dark) {
     AppColors.isDark = dark;
     final bg = dark ? AppColorsDark.background : AppColorsLight.background;
-    final surface = dark ? AppColorsDark.surface : AppColorsLight.surface;
+    final surface = dark ? AppColorsDark.surfaceSolid : AppColorsLight.surfaceSolid;
     final primary = dark ? AppColorsDark.primary : AppColorsLight.primary;
     final text = dark ? AppColorsDark.textPrimary : AppColorsLight.textPrimary;
     final textSec = dark ? AppColorsDark.textSecondary : AppColorsLight.textSecondary;
@@ -14,6 +14,7 @@ class AppTheme {
     final border = dark ? AppColorsDark.border : AppColorsLight.border;
     final accent = dark ? AppColorsDark.accent : AppColorsLight.accent;
     final danger = dark ? AppColorsDark.danger : AppColorsLight.danger;
+    final nav = dark ? AppColorsDark.navBar : AppColorsLight.navBar;
 
     final base = GoogleFonts.vazirmatnTextTheme(
       dark ? ThemeData.dark().textTheme : ThemeData.light().textTheme,
@@ -56,31 +57,30 @@ class AppTheme {
         style: ElevatedButton.styleFrom(
           backgroundColor: primary,
           foregroundColor: Colors.white,
-          elevation: 6,
-          shadowColor: primary.withOpacity(0.45),
+          elevation: 8,
+          shadowColor: primary.withOpacity(0.4),
           minimumSize: const Size.fromHeight(52),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
           textStyle: GoogleFonts.vazirmatn(fontSize: 15, fontWeight: FontWeight.w700),
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
           foregroundColor: primary,
-          side: BorderSide(color: primary.withOpacity(0.5), width: 1.5),
-          elevation: 0,
+          side: BorderSide(color: primary.withOpacity(0.45), width: 1.4),
           minimumSize: const Size.fromHeight(52),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
         ),
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: surface,
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: border)),
-        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: border)),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(18), borderSide: BorderSide.none),
+        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(18), borderSide: BorderSide.none),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
-          borderSide: BorderSide(color: primary, width: 1.5),
+          borderRadius: BorderRadius.circular(18),
+          borderSide: BorderSide(color: primary, width: 1.4),
         ),
         hintStyle: GoogleFonts.vazirmatn(color: muted, fontSize: 14),
         prefixIconColor: muted,
@@ -88,32 +88,33 @@ class AppTheme {
       floatingActionButtonTheme: FloatingActionButtonThemeData(
         backgroundColor: primary,
         foregroundColor: Colors.white,
-        elevation: 8,
-        shape: const CircleBorder(),
+        elevation: 10,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
       ),
       bottomNavigationBarTheme: BottomNavigationBarThemeData(
-        backgroundColor: surface,
+        backgroundColor: nav,
         selectedItemColor: primary,
         unselectedItemColor: muted,
         type: BottomNavigationBarType.fixed,
-        elevation: 12,
+        elevation: 0,
         selectedLabelStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
         unselectedLabelStyle: const TextStyle(fontSize: 11),
       ),
       cardTheme: CardTheme(
         color: surface,
-        elevation: 4,
-        shadowColor: dark ? Colors.black54 : Colors.black26,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        elevation: 0,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       ),
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       ),
       dividerColor: border,
       switchTheme: SwitchThemeData(
-        thumbColor: WidgetStateProperty.resolveWith((s) => s.contains(WidgetState.selected) ? primary : muted),
-        trackColor: WidgetStateProperty.resolveWith((s) => s.contains(WidgetState.selected) ? primary.withOpacity(0.4) : border),
+        thumbColor: WidgetStateProperty.resolveWith((s) => Colors.white),
+        trackColor: WidgetStateProperty.resolveWith(
+          (s) => s.contains(WidgetState.selected) ? primary : muted.withOpacity(0.35),
+        ),
       ),
     );
   }

@@ -1,6 +1,6 @@
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:flutter_contacts/flutter_contacts.dart';
+import 'package:customer_callbook/data/services/contact_cache.dart';
 import 'package:customer_callbook/data/models/customer.dart';
 
 class CustomerService {
@@ -112,20 +112,8 @@ class CustomerService {
   }
 
   Future<String?> lookupNameFromDeviceContacts(String phone) async {
-    try {
-      final granted = await FlutterContacts.requestPermission(readonly: true);
-      if (!granted) return null;
-      final contacts = await FlutterContacts.getContacts(withProperties: true);
-      final norm = Customer.normalizePhone(phone);
-      for (final c in contacts) {
-        for (final p in c.phones) {
-          if (Customer.normalizePhone(p.number) == norm) {
-            final name = c.displayName.trim();
-            if (name.isNotEmpty && !_isJunkName(name)) return name;
-          }
-        }
-      }
-    } catch (_) {}
+    final name = await ContactCache.instance.lookup(phone);
+    if (name != null && name.isNotEmpty && !_isJunkName(name)) return name;
     return null;
   }
 

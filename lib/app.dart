@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 import 'package:customer_callbook/core/theme/app_theme.dart';
 import 'package:customer_callbook/core/theme/app_colors.dart';
 import 'package:customer_callbook/core/theme/theme_controller.dart';
+import 'package:customer_callbook/core/theme/tag_colors.dart';
+import 'package:customer_callbook/data/services/contact_cache.dart';
 import 'package:customer_callbook/features/home/presentation/pages/home_page.dart';
 
 class CustomerCallbookApp extends StatefulWidget {
@@ -18,10 +20,15 @@ class _CustomerCallbookAppState extends State<CustomerCallbookApp> {
   @override
   void initState() {
     super.initState();
-    _theme.load().then((_) {
-      if (mounted) setState(() {});
-    });
+    _init();
     _theme.addListener(_onTheme);
+  }
+
+  Future<void> _init() async {
+    await _theme.load();
+    await TagColors.instance.load();
+    ContactCache.instance.warmUp(); // background, don't wait
+    if (mounted) setState(() {});
   }
 
   void _onTheme() {
@@ -35,7 +42,7 @@ class _CustomerCallbookAppState extends State<CustomerCallbookApp> {
       SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
         statusBarIconBrightness: dark ? Brightness.light : Brightness.dark,
-        systemNavigationBarColor: dark ? const Color(0xFF1A1D27) : const Color(0xFFF4F5FA),
+        systemNavigationBarColor: dark ? const Color(0xFF1A1B2E) : const Color(0xFFE8ECF8),
         systemNavigationBarIconBrightness: dark ? Brightness.light : Brightness.dark,
       ),
     );

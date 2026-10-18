@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:customer_callbook/core/theme/app_colors.dart';
+import 'package:customer_callbook/core/theme/tag_colors.dart';
 import 'package:customer_callbook/data/models/customer.dart';
 import 'package:customer_callbook/data/services/customer_service.dart';
 import 'package:customer_callbook/features/customer_detail/presentation/pages/customer_detail_page.dart';
@@ -205,9 +206,20 @@ class _PhonebookPageState extends State<PhonebookPage> {
                                               Flexible(child: Text(c.name, style: Theme.of(context).textTheme.titleMedium)),
                                             ],
                                           ),
-                                          Text(
-                                            '${c.tag} · ${Customer.phoneTypeLabel(c.phone)}',
-                                            style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.primary),
+                                          Row(
+                                            mainAxisAlignment: MainAxisAlignment.end,
+                                            children: [
+                                              Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                                decoration: BoxDecoration(
+                                                  color: TagColors.instance.of(c.tag).withOpacity(0.15),
+                                                  borderRadius: BorderRadius.circular(8),
+                                                ),
+                                                child: Text(c.tag, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: TagColors.instance.of(c.tag))),
+                                              ),
+                                              const SizedBox(width: 6),
+                                              Text(Customer.phoneTypeLabel(c.phone), style: Theme.of(context).textTheme.bodySmall),
+                                            ],
                                           ),
                                           Text(
                                             Customer.displayPhone(c.phone),

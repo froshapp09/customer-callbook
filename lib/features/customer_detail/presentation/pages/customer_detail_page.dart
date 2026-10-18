@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:customer_callbook/core/theme/app_colors.dart';
+import 'package:customer_callbook/core/theme/tag_colors.dart';
 import 'package:customer_callbook/data/models/customer.dart';
 import 'package:customer_callbook/data/services/customer_service.dart';
 import 'package:customer_callbook/features/add_customer/presentation/pages/add_customer_page.dart';
@@ -178,7 +179,7 @@ class _CustomerDetailPageState extends State<CustomerDetailPage> {
               spacing: 8,
               alignment: WrapAlignment.center,
               children: [
-                _Chip(label: _customer.tag, color: AppColors.primary),
+                _Chip(label: _customer.tag, color: TagColors.instance.of(_customer.tag)),
                 _Chip(label: typeLabel, color: _mobile ? AppColors.accent : AppColors.textMuted),
                 if (isVip) _Chip(label: 'پرتردد', color: AppColors.warning),
               ],
