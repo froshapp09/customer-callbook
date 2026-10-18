@@ -77,7 +77,7 @@ class _PhonebookPageState extends State<PhonebookPage> {
   }
 
   Color _avatarColor(String name) {
-    final colors = [AppColors.avatar1, AppColors.avatar2, AppColors.avatar3, AppColors.avatar4];
+    final colors = AppColors.avatarPalette;
     return colors[name.hashCode.abs() % colors.length];
   }
 
