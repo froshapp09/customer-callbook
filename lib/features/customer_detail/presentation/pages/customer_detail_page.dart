@@ -5,6 +5,7 @@ import 'package:customer_callbook/core/theme/app_colors.dart';
 import 'package:customer_callbook/data/models/customer.dart';
 import 'package:customer_callbook/data/services/customer_service.dart';
 import 'package:customer_callbook/features/add_customer/presentation/pages/add_customer_page.dart';
+import 'package:customer_callbook/shared/widgets/elevated_icon_button.dart';
 
 class CustomerDetailPage extends StatefulWidget {
   final Customer customer;
@@ -207,10 +208,10 @@ class _CustomerDetailPageState extends State<CustomerDetailPage> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
-                _ActionBtn(icon: Icons.phone, label: 'تماس', color: AppColors.accent, onTap: _call),
-                if (_mobile) _ActionBtn(icon: Icons.sms_outlined, label: 'پیامک', color: AppColors.info, onTap: _sms),
-                if (_mobile) _ActionBtn(icon: Icons.chat, label: 'واتساپ', color: const Color(0xFF25D366), onTap: _whatsapp),
-                _ActionBtn(icon: Icons.edit_outlined, label: 'ویرایش', color: AppColors.primary, onTap: _edit),
+                ElevatedIconButton(icon: Icons.phone_rounded, label: 'تماس', color: AppColors.accent, onTap: _call),
+                if (_mobile) ElevatedIconButton(icon: Icons.sms_rounded, label: 'پیامک', color: AppColors.info, onTap: _sms),
+                if (_mobile) ElevatedIconButton(icon: Icons.chat_rounded, label: 'واتساپ', color: const Color(0xFF25D366), onTap: _whatsapp),
+                ElevatedIconButton(icon: Icons.edit_rounded, label: 'ویرایش', color: AppColors.primary, onTap: _edit),
               ],
             ),
             if (!_mobile) ...[
@@ -219,7 +220,7 @@ class _CustomerDetailPageState extends State<CustomerDetailPage> {
                 width: double.infinity,
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: AppColors.surfaceLight,
+                  color: AppColors.surface,
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: const Text(
@@ -286,32 +287,7 @@ class _Chip extends StatelessWidget {
   }
 }
 
-class _ActionBtn extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final Color color;
-  final VoidCallback onTap;
-  const _ActionBtn({required this.icon, required this.label, required this.color, required this.onTap});
 
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Material(
-          color: color.withOpacity(0.12),
-          borderRadius: BorderRadius.circular(16),
-          child: InkWell(
-            onTap: onTap,
-            borderRadius: BorderRadius.circular(16),
-            child: SizedBox(width: 56, height: 56, child: Icon(icon, color: color)),
-          ),
-        ),
-        const SizedBox(height: 6),
-        Text(label, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
-      ],
-    );
-  }
-}
 
 class _InfoCol extends StatelessWidget {
   final String title;

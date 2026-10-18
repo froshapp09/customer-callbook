@@ -163,12 +163,17 @@ class _PhonebookPageState extends State<PhonebookPage> {
                         final c = _filtered[i];
                         return Padding(
                           padding: const EdgeInsets.only(bottom: 10),
-                          child: Material(
-                            color: AppColors.surface,
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: AppColors.surfaceElevated,
+                              borderRadius: BorderRadius.circular(18),
+                              boxShadow: [BoxShadow(color: AppColors.shadow, blurRadius: 12, offset: const Offset(0, 5))],
+                            ),
+                            child: Material(
+                            color: Colors.transparent,
                             borderRadius: BorderRadius.circular(18),
                             child: InkWell(
                               borderRadius: BorderRadius.circular(18),
-                              // کلیک = جزئیات / ویرایش
                               onTap: () async {
                                 await Navigator.push(
                                   context,
@@ -225,6 +230,7 @@ class _PhonebookPageState extends State<PhonebookPage> {
                                 ),
                               ),
                             ),
+                          ),
                           ),
                         );
                       },

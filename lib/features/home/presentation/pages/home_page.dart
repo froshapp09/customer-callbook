@@ -9,6 +9,8 @@ import 'package:customer_callbook/features/call_sync/presentation/pages/call_syn
 import 'package:customer_callbook/features/add_customer/presentation/pages/add_customer_page.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:customer_callbook/core/theme/theme_controller.dart';
+import 'package:customer_callbook/shared/widgets/elevated_icon_button.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -228,49 +230,54 @@ class _CallsTab extends StatelessWidget {
                     final c = recent[i];
                     return Padding(
                       padding: const EdgeInsets.only(bottom: 10),
-                      child: Material(
-                        color: AppColors.surface,
-                        borderRadius: BorderRadius.circular(18),
-                        child: InkWell(
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: AppColors.surfaceElevated,
                           borderRadius: BorderRadius.circular(18),
-                          // کلیک = تماس
-                          onTap: () => onDial(c.phone),
-                          onLongPress: () => onOpenDetail(c),
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                            child: Row(
-                              children: [
-                                // دکمه جزئیات
-                                IconButton(
-                                  icon: const Icon(Icons.info_outline, size: 20, color: AppColors.textMuted),
-                                  onPressed: () => onOpenDetail(c),
-                                  tooltip: 'جزئیات',
-                                ),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.end,
-                                    children: [
-                                      Text(c.name, style: Theme.of(context).textTheme.titleMedium, textAlign: TextAlign.right),
-                                      const SizedBox(height: 2),
-                                      Text(
-                                        Customer.displayPhone(c.phone),
-                                        style: Theme.of(context).textTheme.bodySmall,
-                                        textDirection: TextDirection.ltr,
-                                      ),
-                                      Text(_timeAgo(c.lastCallAt), style: Theme.of(context).textTheme.bodySmall),
-                                    ],
+                          boxShadow: [BoxShadow(color: AppColors.shadow, blurRadius: 14, offset: const Offset(0, 5))],
+                        ),
+                        child: Material(
+                          color: Colors.transparent,
+                          borderRadius: BorderRadius.circular(18),
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(18),
+                            onTap: () => onDial(c.phone),
+                            onLongPress: () => onOpenDetail(c),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                              child: Row(
+                                children: [
+                                  IconButton(
+                                    icon: Icon(Icons.info_outline, size: 20, color: AppColors.textMuted),
+                                    onPressed: () => onOpenDetail(c),
+                                    tooltip: 'جزئیات',
                                   ),
-                                ),
-                                const SizedBox(width: 12),
-                                CircleAvatar(
-                                  radius: 24,
-                                  backgroundColor: _avatarColor(c.name),
-                                  child: Text(
-                                    c.name.isNotEmpty ? c.name.characters.first : '?',
-                                    style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.textPrimary, fontSize: 18),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.end,
+                                      children: [
+                                        Text(c.name, style: Theme.of(context).textTheme.titleMedium, textAlign: TextAlign.right),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          Customer.displayPhone(c.phone),
+                                          style: Theme.of(context).textTheme.bodySmall,
+                                          textDirection: TextDirection.ltr,
+                                        ),
+                                        Text(_timeAgo(c.lastCallAt), style: Theme.of(context).textTheme.bodySmall),
+                                      ],
+                                    ),
                                   ),
-                                ),
-                              ],
+                                  const SizedBox(width: 12),
+                                  CircleAvatar(
+                                    radius: 24,
+                                    backgroundColor: _avatarColor(c.name),
+                                    child: Text(
+                                      c.name.isNotEmpty ? c.name.characters.first : '?',
+                                      style: TextStyle(fontWeight: FontWeight.w700, color: AppColors.textPrimary, fontSize: 18),
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
                         ),
@@ -298,9 +305,10 @@ class _StatCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: AppColors.surfaceElevated,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(color: AppColors.border.withOpacity(0.5)),
+        boxShadow: [BoxShadow(color: AppColors.shadow, blurRadius: 12, offset: const Offset(0, 5))],
       ),
       child: Column(
         children: [
@@ -326,6 +334,8 @@ class _SettingsTab extends StatelessWidget {
       children: [
         Text('تنظیمات', style: Theme.of(context).textTheme.headlineMedium),
         const SizedBox(height: 20),
+        _ThemeTile(),
+        const SizedBox(height: 10),
         _tile(
           context,
           Icons.phone_android,
@@ -362,20 +372,31 @@ class _SettingsTab extends StatelessWidget {
   Widget _tile(BuildContext context, IconData icon, String title, String sub, VoidCallback? onTap) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
-      child: Material(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(16),
+      child: Container(
+        decoration: BoxDecoration(
+          color: AppColors.surfaceElevated,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [BoxShadow(color: AppColors.shadow, blurRadius: 10, offset: const Offset(0, 4))],
+        ),
         child: ListTile(
           onTap: onTap,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           leading: Container(
             padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(color: AppColors.surfaceLight, borderRadius: BorderRadius.circular(12)),
-            child: Icon(icon, color: AppColors.primary, size: 22),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [AppColors.primary.withOpacity(0.9), AppColors.primaryDark],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [BoxShadow(color: AppColors.primary.withOpacity(0.35), blurRadius: 8, offset: const Offset(0, 3))],
+            ),
+            child: Icon(icon, color: Colors.white, size: 22),
           ),
           title: Text(title, style: Theme.of(context).textTheme.titleMedium),
           subtitle: Text(sub, style: Theme.of(context).textTheme.bodySmall),
-          trailing: onTap != null ? const Icon(Icons.chevron_left, color: AppColors.textMuted) : null,
+          trailing: onTap != null ? Icon(Icons.chevron_left, color: AppColors.textMuted) : null,
         ),
       ),
     );
