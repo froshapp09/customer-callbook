@@ -551,7 +551,7 @@ class _HomePageState extends State<HomePage> {
             showAboutDialog(
               context: context,
               applicationName: 'دفترچه مشتریان',
-              applicationVersion: '1.4.0',
+              applicationVersion: '1.5.0',
               applicationLegalese: 'مدیریت تماس، پیامک و مشتریان',
             );
           },
