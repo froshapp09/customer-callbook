@@ -1,0 +1,109 @@
+cat /home/workdir/artifacts/build-apk.yml
+
+name: Build APK
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Require tooling
+        run: |
+          set -e
+          ls -la
+          ls -la tooling/
+          test -f tooling/AndroidManifest.xml
+          test -f tooling/MainActivity.kt
+          grep -q READ_PHONE_STATE tooling/AndroidManifest.xml
+          echo "tooling OK"
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.24.5"
+          channel: stable
+          cache: true
+
+      - name: Flutter create + install permissions
+        run: |
+          set -e
+          flutter config --no-analytics || true
+          flutter create --project-name customer_callbook --org ir.apadanasleep --platforms=android .
+          mkdir -p assets/icons assets/images
+          touch assets/images/.gitkeep
+
+          # FORCE permissions into the app
+          cp -f tooling/AndroidManifest.xml android/app/src/main/AndroidManifest.xml
+          MAIN=$(find android -name MainActivity.kt | head -1)
+          cp -f tooling/MainActivity.kt "$MAIN"
+
+          echo "----- Manifest after install -----"
+          cat android/app/src/main/AndroidManifest.xml
+          grep -q READ_PHONE_STATE android/app/src/main/AndroidManifest.xml
+          grep -q READ_CALL_LOG android/app/src/main/AndroidManifest.xml
+          grep -q READ_CONTACTS android/app/src/main/AndroidManifest.xml
+          echo "permissions installed OK"
+
+      - name: Icon + SDK
+        run: |
+          set -e
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq imagemagick || true
+          if [ -f assets/icons/app_icon.png ]; then
+            for folder in mdpi hdpi xhdpi xxhdpi xxxhdpi; do
+              case $folder in
+                mdpi) size=48 ;;
+                hdpi) size=72 ;;
+                xhdpi) size=96 ;;
+                xxhdpi) size=144 ;;
+                xxxhdpi) size=192 ;;
+              esac
+              dir="android/app/src/main/res/mipmap-$folder"
+              mkdir -p "$dir"
+              convert assets/icons/app_icon.png -resize ${size}x${size} "$dir/ic_launcher.png" 2>/dev/null \
+                || cp assets/icons/app_icon.png "$dir/ic_launcher.png"
+              cp "$dir/ic_launcher.png" "$dir/ic_launcher_round.png" 2>/dev/null || true
+            done
+            rm -rf android/app/src/main/res/mipmap-anydpi-v26 || true
+          fi
+          find android -name "build.gradle*" -type f | while read f; do
+            sed -i -E 's/compileSdk(Version)?[[:space:]=]+[0-9]+/compileSdk = 35/g' "$f" || true
+            sed -i -E 's/targetSdk(Version)?[[:space:]=]+[0-9]+/targetSdk = 35/g' "$f" || true
+          done
+
+      - name: pub get
+        run: flutter pub get
+
+      - name: Re-apply manifest after pub get
+        run: |
+          set -e
+          cp -f tooling/AndroidManifest.xml android/app/src/main/AndroidManifest.xml
+          grep -q READ_PHONE_STATE android/app/src/main/AndroidManifest.xml
+          echo "manifest re-applied"
+
+      - name: Build APK
+        run: flutter build apk --release
+
+      - name: Must have phone permissions in APK
+        run: |
+          set -e
+          sudo apt-get install -y -qq aapt
+          APK=build/app/outputs/flutter-apk/app-release.apk
+          aapt dump permissions "$APK" | tee /tmp/p.txt
+          grep -q READ_PHONE_STATE /tmp/p.txt
+          grep -q READ_CALL_LOG /tmp/p.txt
+          grep -q READ_CONTACTS /tmp/p.txt
+          echo "SUCCESS permissions in APK"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: customer-callbook-apk
+          path: build/app/outputs/flutter-apk/app-release.apk
