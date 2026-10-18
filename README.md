@@ -1,71 +1,27 @@
-# دفترچه مشتریان هوشمند (Customer Callbook)
+# دفترچه مشتریان (customer_callbook)
 
-اپلیکیشن مدیریت مشتریان و ثبت تماس‌ها با تم تیره مینیمال.
+نسخه: **1.5.1**
 
-## روش ساخت APK با GitHub (ساده و قطعی)
+## ساخت APK با GitHub Actions
 
-### مرحله ۱: ساخت پروژه کامل روی کامپیوتر
+1. کل محتویات این پروژه را در ریپو آپلود کنید (حتماً پوشه `tooling` و `.github/workflows`)
+2. بروید به: Actions → **Build APK** → Run workflow
+3. در لاگ باید این خط باشد:
+   `SUCCESS: phone/call/contacts permissions are inside the APK`
+4. از Artifacts فایل APK را دانلود کنید
+5. برنامه قبلی را از گوشی حذف کنید و APK جدید را نصب کنید
+6. نسخه باید **1.5.1** باشد
+7. تنظیمات → برنامه‌ها → مجوزها → مشاهده همه مجوزها
+   باید تلفن، مخاطبین، پیامک و... دیده شود
 
-```bash
-# ۱. یک پوشه جدید بساز
-mkdir customer_callbook
-cd customer_callbook
+## ساختار مهم
 
-# ۲. پروژه فلاتر بساز
-flutter create .
+- `tooling/AndroidManifest.xml` → مجوزهای اندروید
+- `tooling/MainActivity.kt` → خواندن تاریخچه تماس
+- `.github/workflows/build-apk.yml` → بیلد (حتماً نسخه کامل با Install Manifest)
 
-# ۳. فایل‌های این پروژه را جایگزین کن:
-#    - پوشه lib را کامل جایگزین کن
-#    - فایل pubspec.yaml را جایگزین کن
-#    - فایل analysis_options.yaml را جایگزین کن
-#    - پوشه .github را کپی کن
+## اگر مجوز خالی بود
 
-# ۴. وابستگی‌ها را بگیر
-flutter pub get
-```
-
-### مرحله ۲: آپلود روی GitHub
-
-```bash
-git init
-git add .
-git commit -m "نسخه اول دفترچه مشتریان"
-git branch -M main
-git remote add origin https://github.com/YOUR_USERNAME/customer-callbook.git
-git push -u origin main
-```
-
-YOUR_USERNAME را با نام کاربری گیت‌هاب خودت عوض کن.
-
-### مرحله ۳: گرفتن APK
-
-1. برو به صفحه ریپو در GitHub
-2. تب **Actions** را باز کن
-3. روی **Build APK** کلیک کن
-4. دکمه **Run workflow** را بزن
-5. بعد از سبز شدن، پایین صفحه بخش **Artifacts** را پیدا کن
-6. فایل customer-callbook-apk را دانلود کن
-7. داخلش app-release.apk است → روی گوشی نصب کن
-
----
-
-## اگر Actions کار نکرد (روش جایگزین)
-
-روی کامپیوتر خودت این دستور را بزن:
-
-```bash
-flutter build apk --release
-```
-
-فایل APK اینجا ساخته می‌شود:
-build/app/outputs/flutter-apk/app-release.apk
-
----
-
-## نکته خیلی مهم
-
-برای اینکه GitHub Actions بتواند APK بسازد، حتماً باید اول دستور زیر را زده باشی تا پوشه‌های android و ios ساخته شوند:
-
-```bash
-flutter create .
-```
+یعنی workflow قدیمی روی گیت‌هاب است. فایل
+`.github/workflows/build-apk.yml`
+را از این پروژه دوباره آپلود کنید.
