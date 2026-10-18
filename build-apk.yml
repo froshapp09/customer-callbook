@@ -1,0 +1,115 @@
+name: Build APK
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check tooling files exist
+        run: |
+          set -e
+          echo "Files in repo:"
+          find . -maxdepth 3 -type f | head -80
+          test -f tooling/AndroidManifest.xml || { echo "ERROR: tooling/AndroidManifest.xml missing - upload tooling folder!"; exit 1; }
+          test -f tooling/MainActivity.kt || { echo "ERROR: tooling/MainActivity.kt missing!"; exit 1; }
+          echo "=== tooling Manifest permissions ==="
+          grep uses-permission tooling/AndroidManifest.xml
+          COUNT=$(grep -c uses-permission tooling/AndroidManifest.xml)
+          test "$COUNT" -ge 10 || { echo "ERROR: too few permissions in tooling manifest"; exit 1; }
+          echo "OK tooling files present ($COUNT permissions)"
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.24.5'
+          channel: 'stable'
+          cache: true
+
+      - name: Create Android platform
+        run: |
+          flutter config --no-analytics || true
+          flutter create --project-name customer_callbook --org ir.apadanasleep --platforms=android .
+          mkdir -p assets/icons assets/images
+          touch assets/images/.gitkeep
+
+      - name: Install Manifest + MainActivity
+        run: |
+          set -e
+          cp -f tooling/AndroidManifest.xml android/app/src/main/AndroidManifest.xml
+          MAIN=$(find android -name MainActivity.kt | head -1)
+          echo "MainActivity: $MAIN"
+          cp -f tooling/MainActivity.kt "$MAIN"
+
+          echo "=== installed Manifest ==="
+          cat android/app/src/main/AndroidManifest.xml
+
+          grep -q 'android.permission.READ_PHONE_STATE' android/app/src/main/AndroidManifest.xml
+          grep -q 'android.permission.READ_CALL_LOG' android/app/src/main/AndroidManifest.xml
+          grep -q 'android.permission.READ_CONTACTS' android/app/src/main/AndroidManifest.xml
+          grep -q 'android.permission.CALL_PHONE' android/app/src/main/AndroidManifest.xml
+          echo "OK source Manifest has required permissions"
+
+      - name: Apply icon + SDK 35
+        run: |
+          set -e
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq imagemagick || true
+          if [ -f assets/icons/app_icon.png ]; then
+            for folder in mdpi hdpi xhdpi xxhdpi xxxhdpi; do
+              case $folder in
+                mdpi) size=48 ;;
+                hdpi) size=72 ;;
+                xhdpi) size=96 ;;
+                xxhdpi) size=144 ;;
+                xxxhdpi) size=192 ;;
+              esac
+              dir="android/app/src/main/res/mipmap-$folder"
+              mkdir -p "$dir"
+              convert assets/icons/app_icon.png -resize ${size}x${size} "$dir/ic_launcher.png" 2>/dev/null \
+                || cp assets/icons/app_icon.png "$dir/ic_launcher.png"
+              cp "$dir/ic_launcher.png" "$dir/ic_launcher_round.png" 2>/dev/null || true
+            done
+            rm -rf android/app/src/main/res/mipmap-anydpi-v26 || true
+            ls -la android/app/src/main/res/mipmap-hdpi/
+            echo "Icon applied"
+          else
+            echo "WARNING: assets/icons/app_icon.png missing"
+          fi
+          find android -name "build.gradle*" -type f | while read f; do
+            sed -i -E 's/compileSdk(Version)?[[:space:]=]+[0-9]+/compileSdk = 35/g' "$f" || true
+            sed -i -E 's/targetSdk(Version)?[[:space:]=]+[0-9]+/targetSdk = 35/g' "$f" || true
+          done
+
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Build APK
+        run: flutter build apk --release
+
+      - name: Verify permissions inside APK (MUST pass)
+        run: |
+          set -e
+          sudo apt-get install -y -qq aapt || true
+          APK=build/app/outputs/flutter-apk/app-release.apk
+          test -f "$APK"
+          echo "=== aapt dump permissions ==="
+          aapt dump permissions "$APK" | tee /tmp/perms.txt
+          echo "=== check ==="
+          grep -q "READ_PHONE_STATE" /tmp/perms.txt
+          grep -q "READ_CALL_LOG" /tmp/perms.txt
+          grep -q "READ_CONTACTS" /tmp/perms.txt
+          echo "SUCCESS: phone/call/contacts permissions are inside the APK"
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: customer-callbook-apk
+          path: build/app/outputs/flutter-apk/app-release.apk
