@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:customer_callbook/core/theme/app_colors.dart';
 import 'package:customer_callbook/data/models/customer.dart';
 import 'package:customer_callbook/data/services/customer_service.dart';
 import 'package:customer_callbook/features/customer_detail/presentation/pages/customer_detail_page.dart';
 import 'package:customer_callbook/features/add_customer/presentation/pages/add_customer_page.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 class PhonebookPage extends StatefulWidget {
   final VoidCallback? onChanged;
@@ -16,36 +16,57 @@ class PhonebookPage extends StatefulWidget {
 
 class _PhonebookPageState extends State<PhonebookPage> {
   final _service = CustomerService();
-  final _searchCtrl = TextEditingController();
+  final _search = TextEditingController();
   List<Customer> _all = [];
   List<Customer> _filtered = [];
+  String _tag = 'همه';
   bool _loading = true;
 
   @override
   void initState() {
     super.initState();
     _load();
-    _searchCtrl.addListener(_filter);
   }
 
   @override
   void dispose() {
-    _searchCtrl.dispose();
+    _search.dispose();
     super.dispose();
   }
 
   Future<void> _load() async {
     setState(() => _loading = true);
     final list = await _service.getAll();
-    setState(() {
-      _all = list;
-      _filtered = list;
-      _loading = false;
-    });
+    if (mounted) {
+      setState(() {
+        _all = list;
+        _loading = false;
+      });
+      _apply();
+    }
+  }
+
+  void _apply() {
+    var list = List<Customer>.from(_all);
+    if (_tag == 'ویژه') {
+      list = list.where((c) => c.favorite).toList();
+    } else if (_tag != 'همه') {
+      list = list.where((c) => c.tag == _tag).toList();
+    }
+    final q = _search.text.trim();
+    if (q.isNotEmpty) {
+      final lower = q.toLowerCase();
+      list = list.where((c) {
+        return c.name.toLowerCase().contains(lower) ||
+            c.phone.contains(q) ||
+            Customer.normalizePhone(c.phone).contains(Customer.normalizePhone(q));
+      }).toList();
+    }
+    setState(() => _filtered = list);
   }
 
   Future<void> _dial(String phone) async {
-    final uri = Uri(scheme: 'tel', path: phone);
+    final uri = Uri(scheme: 'tel', path: Customer.normalizePhone(phone));
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri);
       await _service.recordCall(phone);
@@ -54,17 +75,9 @@ class _PhonebookPageState extends State<PhonebookPage> {
     }
   }
 
-  void _filter() {
-    final q = _searchCtrl.text.trim().toLowerCase();
-    setState(() {
-      if (q.isEmpty) {
-        _filtered = _all;
-      } else {
-        _filtered = _all.where((c) {
-          return c.name.toLowerCase().contains(q) || c.phone.contains(q);
-        }).toList();
-      }
-    });
+  Color _avatarColor(String name) {
+    final colors = [AppColors.avatar1, AppColors.avatar2, AppColors.avatar3, AppColors.avatar4];
+    return colors[name.hashCode.abs() % colors.length];
   }
 
   @override
@@ -72,149 +85,149 @@ class _PhonebookPageState extends State<PhonebookPage> {
     return Column(
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
-          child: Row(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(
-                child: Text('دفترچه تلفن', style: Theme.of(context).textTheme.headlineMedium),
+              Text('مشتریان', style: Theme.of(context).textTheme.headlineMedium),
+              const SizedBox(height: 4),
+              Text('دفترچه مخاطبین کسب‌وکار', style: Theme.of(context).textTheme.bodyMedium),
+              const SizedBox(height: 14),
+              TextField(
+                controller: _search,
+                onChanged: (_) => _apply(),
+                decoration: const InputDecoration(
+                  hintText: 'جستجوی مخاطب...',
+                  prefixIcon: Icon(Icons.search),
+                ),
               ),
-              Text('${_all.length} مشتری', style: Theme.of(context).textTheme.bodySmall),
+              const SizedBox(height: 12),
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: ['همه', 'ویژه', 'مشتری', 'همکار', 'سایر'].map((t) {
+                    final sel = _tag == t;
+                    return Padding(
+                      padding: const EdgeInsets.only(left: 8),
+                      child: ChoiceChip(
+                        label: Text(t),
+                        selected: sel,
+                        onSelected: (_) {
+                          setState(() => _tag = t);
+                          _apply();
+                        },
+                        selectedColor: AppColors.primary,
+                        labelStyle: TextStyle(
+                          color: sel ? Colors.white : AppColors.textSecondary,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13,
+                        ),
+                        backgroundColor: AppColors.surface,
+                        side: BorderSide(color: sel ? AppColors.primary : AppColors.border),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
+              const SizedBox(height: 8),
             ],
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-          child: TextField(
-            controller: _searchCtrl,
-            decoration: const InputDecoration(
-              hintText: 'جستجوی مشتری...',
-              prefixIcon: Icon(Icons.search, color: AppColors.textMuted),
-            ),
           ),
         ),
         Expanded(
           child: _loading
-              ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
+              ? const Center(child: CircularProgressIndicator())
               : _filtered.isEmpty
                   ? Center(
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Icon(Icons.people_outline, size: 64, color: AppColors.textMuted),
-                          const SizedBox(height: 16),
-                          Text(
-                            _searchCtrl.text.isEmpty ? 'هنوز مشتریی ندارید' : 'نتیجه‌ای یافت نشد',
-                            style: const TextStyle(color: AppColors.textMuted),
+                          const Icon(Icons.person_off_outlined, size: 48, color: AppColors.textMuted),
+                          const SizedBox(height: 12),
+                          Text('مشتری‌ای نیست', style: Theme.of(context).textTheme.bodyMedium),
+                          TextButton(
+                            onPressed: () async {
+                              await Navigator.push(context, MaterialPageRoute(builder: (_) => const AddCustomerPage()));
+                              _load();
+                              widget.onChanged?.call();
+                            },
+                            child: const Text('افزودن مشتری'),
                           ),
-                          if (_searchCtrl.text.isEmpty) ...[
-                            const SizedBox(height: 16),
-                            ElevatedButton.icon(
-                              onPressed: () async {
-                                await Navigator.push(
-                                  context,
-                                  MaterialPageRoute(builder: (_) => const AddCustomerPage()),
-                                );
-                                _load();
-                                widget.onChanged?.call();
-                              },
-                              icon: const Icon(Icons.add),
-                              label: const Text('افزودن مشتری'),
-                            ),
-                          ],
                         ],
                       ),
                     )
-                  : RefreshIndicator(
-                      color: AppColors.primary,
-                      onRefresh: _load,
-                      child: ListView.builder(
-                        padding: const EdgeInsets.fromLTRB(20, 12, 20, 100),
-                        itemCount: _filtered.length,
-                        itemBuilder: (context, index) {
-                          final c = _filtered[index];
-                          return Padding(
-                            padding: const EdgeInsets.only(bottom: 10),
+                  : ListView.builder(
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
+                      itemCount: _filtered.length,
+                      itemBuilder: (context, i) {
+                        final c = _filtered[i];
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 10),
+                          child: Material(
+                            color: AppColors.surface,
+                            borderRadius: BorderRadius.circular(18),
                             child: InkWell(
-                              onTap: () => _dial(c.phone),
-                              onLongPress: () async {
+                              borderRadius: BorderRadius.circular(18),
+                              // کلیک = جزئیات / ویرایش
+                              onTap: () async {
                                 await Navigator.push(
                                   context,
-                                  MaterialPageRoute(
-                                    builder: (_) => CustomerDetailPage(customer: c),
-                                  ),
+                                  MaterialPageRoute(builder: (_) => CustomerDetailPage(customer: c)),
                                 );
                                 _load();
                                 widget.onChanged?.call();
                               },
-                              borderRadius: BorderRadius.circular(16),
-                              child: Container(
-                                padding: const EdgeInsets.all(16),
-                                decoration: BoxDecoration(
-                                  color: AppColors.surface,
-                                  borderRadius: BorderRadius.circular(16),
-                                  border: Border.all(color: AppColors.border),
-                                ),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                                 child: Row(
                                   children: [
-                                    CircleAvatar(
-                                      radius: 24,
-                                      backgroundColor: AppColors.surfaceLight,
-                                      child: Text(
-                                        c.name.isNotEmpty ? c.name.characters.first : '?',
-                                        style: const TextStyle(
-                                          color: AppColors.primary,
-                                          fontWeight: FontWeight.w600,
-                                          fontSize: 18,
-                                        ),
-                                      ),
+                                    // دکمه تماس سریع
+                                    IconButton(
+                                      onPressed: () => _dial(c.phone),
+                                      icon: const Icon(Icons.phone, color: AppColors.accent),
+                                      style: IconButton.styleFrom(backgroundColor: AppColors.accent.withOpacity(0.12)),
                                     ),
-                                    const SizedBox(width: 14),
+                                    const SizedBox(width: 8),
                                     Expanded(
                                       child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        crossAxisAlignment: CrossAxisAlignment.end,
                                         children: [
-                                          Text(c.name, style: Theme.of(context).textTheme.titleMedium),
-                                          const SizedBox(height: 4),
-                                          Text(c.phone, style: Theme.of(context).textTheme.bodyMedium),
+                                          Row(
+                                            mainAxisAlignment: MainAxisAlignment.end,
+                                            children: [
+                                              if (c.favorite) const Icon(Icons.star, size: 14, color: AppColors.warning),
+                                              if (c.favorite) const SizedBox(width: 4),
+                                              Flexible(child: Text(c.name, style: Theme.of(context).textTheme.titleMedium)),
+                                            ],
+                                          ),
+                                          Text(
+                                            '${c.tag} · ${Customer.phoneTypeLabel(c.phone)}',
+                                            style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.primary),
+                                          ),
+                                          Text(
+                                            Customer.displayPhone(c.phone),
+                                            style: Theme.of(context).textTheme.bodySmall,
+                                            textDirection: TextDirection.ltr,
+                                          ),
                                         ],
                                       ),
                                     ),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                                      decoration: BoxDecoration(
-                                        color: AppColors.primary.withOpacity(0.12),
-                                        borderRadius: BorderRadius.circular(20),
-                                      ),
+                                    const SizedBox(width: 12),
+                                    CircleAvatar(
+                                      radius: 24,
+                                      backgroundColor: _avatarColor(c.name),
                                       child: Text(
-                                        '${c.callCount} تماس',
-                                        style: const TextStyle(
-                                          color: AppColors.primary,
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.w500,
-                                        ),
+                                        c.name.isNotEmpty ? c.name.characters.first : '?',
+                                        style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 18, color: AppColors.textPrimary),
                                       ),
-                                    ),
-                                    IconButton(
-                                      icon: const Icon(Icons.info_outline, color: AppColors.textMuted, size: 22),
-                                      tooltip: 'جزئیات',
-                                      onPressed: () async {
-                                        await Navigator.push(
-                                          context,
-                                          MaterialPageRoute(
-                                            builder: (_) => CustomerDetailPage(customer: c),
-                                          ),
-                                        );
-                                        _load();
-                                        widget.onChanged?.call();
-                                      },
                                     ),
                                   ],
                                 ),
                               ),
                             ),
-                          );
-                        },
-                      ),
+                          ),
+                        );
+                      },
                     ),
         ),
       ],

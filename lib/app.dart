@@ -10,7 +10,7 @@ class CustomerCallbookApp extends StatelessWidget {
     return MaterialApp(
       title: 'دفترچه مشتریان',
       debugShowCheckedModeBanner: false,
-      theme: AppTheme.darkTheme,
+      theme: AppTheme.lightTheme,
       home: const HomePage(),
       builder: (context, child) {
         return Directionality(

@@ -1,119 +1,142 @@
+import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:customer_callbook/data/models/customer.dart';
 import 'package:flutter_contacts/flutter_contacts.dart';
-import 'package:permission_handler/permission_handler.dart';
+import 'package:customer_callbook/data/models/customer.dart';
 
 class CustomerService {
-  static const _key = 'customers_list';
+  static const _key = 'customers_v2';
 
   Future<List<Customer>> getAll() async {
     final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getStringList(_key) ?? [];
-    return raw.map((e) => Customer.fromJson(e)).toList()
+    final raw = prefs.getString(_key);
+    if (raw == null || raw.isEmpty) return [];
+    final list = jsonDecode(raw) as List;
+    return list.map((e) => Customer.fromJson(Map<String, dynamic>.from(e))).toList()
       ..sort((a, b) {
-        final aTime = a.lastCallAt ?? a.createdAt;
-        final bTime = b.lastCallAt ?? b.createdAt;
-        return bTime.compareTo(aTime);
+        final aT = a.lastCallAt ?? a.createdAt;
+        final bT = b.lastCallAt ?? b.createdAt;
+        return bT.compareTo(aT);
       });
   }
 
-  Future<void> saveAll(List<Customer> list) async {
+  Future<void> _save(List<Customer> list) async {
     final prefs = await SharedPreferences.getInstance();
-    final raw = list.map((e) => e.toJson()).toList();
-    await prefs.setStringList(_key, raw);
+    await prefs.setString(_key, jsonEncode(list.map((e) => e.toJson()).toList()));
   }
 
-  Future<void> add(Customer customer) async {
-    final list = await getAll();
-    // جلوگیری از شماره تکراری
-    final cleaned = customer.phone.replaceAll(RegExp(r'\D'), '');
-    final exists = list.any((e) => e.phone.replaceAll(RegExp(r'\D'), '') == cleaned);
-    if (exists) return;
-    list.add(customer);
-    await saveAll(list);
+  Future<Customer> add(Customer c) async {
+    final all = await getAll();
+    // جلوگیری از تکراری
+    final norm = Customer.normalizePhone(c.phone);
+    final idx = all.indexWhere((e) => Customer.normalizePhone(e.phone) == norm);
+    if (idx >= 0) {
+      final existing = all[idx];
+      final updated = existing.copyWith(
+        name: c.name.isNotEmpty && c.name != c.phone ? c.name : existing.name,
+        callCount: existing.callCount + (c.callCount > 0 ? c.callCount : 0),
+        lastCallAt: c.lastCallAt ?? existing.lastCallAt,
+        firstCallAt: existing.firstCallAt ?? c.firstCallAt,
+      );
+      all[idx] = updated;
+      await _save(all);
+      return updated;
+    }
+    all.add(c);
+    await _save(all);
+    return c;
   }
 
-  Future<void> update(Customer customer) async {
-    final list = await getAll();
-    final index = list.indexWhere((e) => e.id == customer.id);
-    if (index != -1) {
-      list[index] = customer;
-      await saveAll(list);
+  Future<void> update(Customer c) async {
+    final all = await getAll();
+    final i = all.indexWhere((e) => e.id == c.id);
+    if (i >= 0) {
+      all[i] = c;
+      await _save(all);
     }
   }
 
   Future<void> delete(String id) async {
-    final list = await getAll();
-    list.removeWhere((e) => e.id == id);
-    await saveAll(list);
+    final all = await getAll();
+    all.removeWhere((e) => e.id == id);
+    await _save(all);
   }
 
   Future<Customer?> findByPhone(String phone) async {
-    final list = await getAll();
-    final cleaned = phone.replaceAll(RegExp(r'\D'), '');
-    if (cleaned.isEmpty) return null;
+    final norm = Customer.normalizePhone(phone);
+    final all = await getAll();
     try {
-      return list.firstWhere((e) {
-        final p = e.phone.replaceAll(RegExp(r'\D'), '');
-        return p == cleaned || p.endsWith(cleaned) || cleaned.endsWith(p);
-      });
+      return all.firstWhere((e) => Customer.normalizePhone(e.phone) == norm);
     } catch (_) {
       return null;
     }
   }
 
-  /// فقط وقتی تماس واقعی رخ داده فراخوانی شود
-  Future<void> recordCall(String phone, {String? name}) async {
+  Future<Customer> recordCall(String phone, {String? name}) async {
     final existing = await findByPhone(phone);
+    final now = DateTime.now();
     if (existing != null) {
       final updated = existing.copyWith(
         callCount: existing.callCount + 1,
-        lastCallAt: DateTime.now(),
-        firstCallAt: existing.firstCallAt ?? DateTime.now(),
+        lastCallAt: now,
+        firstCallAt: existing.firstCallAt ?? now,
+        name: (name != null && name.isNotEmpty && !_isJunkName(name)) ? name : existing.name,
       );
       await update(updated);
-    } else {
-      // مشتری جدید فقط اگر نام داشته باشیم از مخاطبین
-      final displayName = name ?? await lookupNameFromDeviceContacts(phone);
-      await add(Customer(
-        name: displayName ?? phone,
-        phone: phone,
-        callCount: 1,
-        firstCallAt: DateTime.now(),
-        lastCallAt: DateTime.now(),
-      ));
+      return updated;
     }
+    final resolved = await lookupNameFromDeviceContacts(phone);
+    final finalName = (name != null && !_isJunkName(name))
+        ? name
+        : (resolved ?? phone);
+    final c = Customer(
+      name: finalName,
+      phone: Customer.normalizePhone(phone),
+      callCount: 1,
+      firstCallAt: now,
+      lastCallAt: now,
+    );
+    return add(c);
   }
 
-  /// دریافت نام از دفترچه تلفن گوشی (شیائومی/هواوی/سامسونگ)
+  /// نام‌های بی‌معنی اپراتور/سیستم را رد می‌کند
+  static bool _isJunkName(String name) {
+    final n = name.trim();
+    if (n.isEmpty) return true;
+    if (n.length < 2) return true;
+    // مثل B.QMEHRIRAN یا فقط عدد
+    if (RegExp(r'^[A-Z0-9.\-_+]+$').hasMatch(n) && !RegExp(r'[\u0600-\u06FF]').hasMatch(n)) {
+      if (n.contains('.') || n.length > 12) return true;
+    }
+    if (RegExp(r'^\+?\d+$').hasMatch(n)) return true;
+    return false;
+  }
+
   Future<String?> lookupNameFromDeviceContacts(String phone) async {
     try {
-      final status = await Permission.contacts.status;
-      if (!status.isGranted) {
-        final req = await Permission.contacts.request();
-        if (!req.isGranted) return null;
-      }
-
-      if (!await FlutterContacts.requestPermission(readonly: true)) {
-        return null;
-      }
-
+      final granted = await FlutterContacts.requestPermission(readonly: true);
+      if (!granted) return null;
       final contacts = await FlutterContacts.getContacts(withProperties: true);
-      final cleaned = phone.replaceAll(RegExp(r'\D'), '');
-      if (cleaned.length < 7) return null;
-
+      final norm = Customer.normalizePhone(phone);
       for (final c in contacts) {
-        for (final ph in c.phones) {
-          final p = ph.number.replaceAll(RegExp(r'\D'), '');
-          if (p == cleaned || p.endsWith(cleaned) || cleaned.endsWith(p)) {
+        for (final p in c.phones) {
+          if (Customer.normalizePhone(p.number) == norm) {
             final name = c.displayName.trim();
-            if (name.isNotEmpty) return name;
+            if (name.isNotEmpty && !_isJunkName(name)) return name;
           }
         }
       }
-    } catch (e) {
-      // ignore
-    }
+    } catch (_) {}
     return null;
+  }
+
+  Future<List<Customer>> search(String q) async {
+    final all = await getAll();
+    if (q.trim().isEmpty) return all;
+    final lower = q.trim().toLowerCase();
+    return all.where((c) {
+      return c.name.toLowerCase().contains(lower) ||
+          c.phone.contains(lower) ||
+          Customer.normalizePhone(c.phone).contains(Customer.normalizePhone(q));
+    }).toList();
   }
 }

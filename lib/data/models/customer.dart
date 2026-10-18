@@ -1,26 +1,27 @@
-import 'dart:convert';
 import 'package:uuid/uuid.dart';
 
 class Customer {
   final String id;
-  String name;
-  String phone;
-  String? note;
-  int callCount;
-  DateTime? firstCallAt;
-  DateTime? lastCallAt;
-  bool isFavorite;
-  DateTime createdAt;
+  final String name;
+  final String phone;
+  final String? note;
+  final String tag; // مشتری، همکار، سایر
+  final bool favorite;
+  final int callCount;
+  final DateTime? firstCallAt;
+  final DateTime? lastCallAt;
+  final DateTime createdAt;
 
   Customer({
     String? id,
     required this.name,
     required this.phone,
     this.note,
+    this.tag = 'مشتری',
+    this.favorite = false,
     this.callCount = 0,
     this.firstCallAt,
     this.lastCallAt,
-    this.isFavorite = false,
     DateTime? createdAt,
   })  : id = id ?? const Uuid().v4(),
         createdAt = createdAt ?? DateTime.now();
@@ -29,52 +30,98 @@ class Customer {
     String? name,
     String? phone,
     String? note,
+    String? tag,
+    bool? favorite,
     int? callCount,
     DateTime? firstCallAt,
     DateTime? lastCallAt,
-    bool? isFavorite,
   }) {
     return Customer(
       id: id,
       name: name ?? this.name,
       phone: phone ?? this.phone,
       note: note ?? this.note,
+      tag: tag ?? this.tag,
+      favorite: favorite ?? this.favorite,
       callCount: callCount ?? this.callCount,
       firstCallAt: firstCallAt ?? this.firstCallAt,
       lastCallAt: lastCallAt ?? this.lastCallAt,
-      isFavorite: isFavorite ?? this.isFavorite,
       createdAt: createdAt,
     );
   }
 
-  Map<String, dynamic> toMap() {
-    return {
-      'id': id,
-      'name': name,
-      'phone': phone,
-      'note': note,
-      'callCount': callCount,
-      'firstCallAt': firstCallAt?.toIso8601String(),
-      'lastCallAt': lastCallAt?.toIso8601String(),
-      'isFavorite': isFavorite,
-      'createdAt': createdAt.toIso8601String(),
-    };
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'name': name,
+        'phone': phone,
+        'note': note,
+        'tag': tag,
+        'favorite': favorite,
+        'callCount': callCount,
+        'firstCallAt': firstCallAt?.toIso8601String(),
+        'lastCallAt': lastCallAt?.toIso8601String(),
+        'createdAt': createdAt.toIso8601String(),
+      };
+
+  factory Customer.fromJson(Map<String, dynamic> j) => Customer(
+        id: j['id'] as String?,
+        name: (j['name'] as String?) ?? '',
+        phone: (j['phone'] as String?) ?? '',
+        note: j['note'] as String?,
+        tag: (j['tag'] as String?) ?? 'مشتری',
+        favorite: (j['favorite'] as bool?) ?? false,
+        callCount: (j['callCount'] as int?) ?? 0,
+        firstCallAt: j['firstCallAt'] != null ? DateTime.tryParse(j['firstCallAt']) : null,
+        lastCallAt: j['lastCallAt'] != null ? DateTime.tryParse(j['lastCallAt']) : null,
+        createdAt: j['createdAt'] != null ? DateTime.tryParse(j['createdAt']) : null,
+      );
+
+  static String normalizePhone(String phone) {
+    var p = phone.replaceAll(RegExp(r'[\s\-\(\)]'), '');
+    if (p.startsWith('+98')) p = '0${p.substring(3)}';
+    if (p.startsWith('0098')) p = '0${p.substring(4)}';
+    if (p.startsWith('98') && p.length >= 12) p = '0${p.substring(2)}';
+    return p;
   }
 
-  factory Customer.fromMap(Map<String, dynamic> map) {
-    return Customer(
-      id: map['id'] ?? const Uuid().v4(),
-      name: map['name'] ?? '',
-      phone: map['phone'] ?? '',
-      note: map['note'],
-      callCount: map['callCount'] ?? 0,
-      firstCallAt: map['firstCallAt'] != null ? DateTime.tryParse(map['firstCallAt']) : null,
-      lastCallAt: map['lastCallAt'] != null ? DateTime.tryParse(map['lastCallAt']) : null,
-      isFavorite: map['isFavorite'] ?? false,
-      createdAt: map['createdAt'] != null ? DateTime.tryParse(map['createdAt']) ?? DateTime.now() : DateTime.now(),
-    );
+  /// موبایل ایران: 09xxxxxxxxx (۱۱ رقم)
+  static bool isMobile(String phone) {
+    final n = normalizePhone(phone);
+    return RegExp(r'^09\d{9}$').hasMatch(n);
   }
 
-  String toJson() => jsonEncode(toMap());
-  factory Customer.fromJson(String source) => Customer.fromMap(jsonDecode(source));
+  /// شماره ثابت ایران (تقریبی)
+  static bool isLandline(String phone) {
+    final n = normalizePhone(phone);
+    if (isMobile(n)) return false;
+    // 0 + کد شهر (۲–۳ رقم) + شماره
+    return RegExp(r'^0[1-8]\d{5,10}$').hasMatch(n);
+  }
+
+  static String phoneTypeLabel(String phone) {
+    if (isMobile(phone)) return 'موبایل';
+    if (isLandline(phone)) return 'ثابت';
+    return 'سایر';
+  }
+
+  static String displayPhone(String phone) {
+    final n = normalizePhone(phone);
+    if (n.length == 11 && n.startsWith('09')) {
+      return '${n.substring(0, 4)} ${n.substring(4, 7)} ${n.substring(7)}';
+    }
+    if (n.length >= 8 && n.startsWith('0')) {
+      // ثابت: 021 1234 5678
+      if (n.length == 11) {
+        return '${n.substring(0, 3)} ${n.substring(3, 7)} ${n.substring(7)}';
+      }
+    }
+    return phone;
+  }
+
+  /// برای واتساپ: 98912...
+  static String toWhatsAppNumber(String phone) {
+    var p = normalizePhone(phone);
+    if (p.startsWith('0')) p = '98${p.substring(1)}';
+    return p;
+  }
 }

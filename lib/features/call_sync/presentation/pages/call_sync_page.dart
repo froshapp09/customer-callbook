@@ -123,8 +123,11 @@ class _CallSyncPageState extends State<CallSyncPage> {
       }
     } else {
       String name = (e['name'] ?? '').toString().trim();
-      if (name.isEmpty || name == phone) {
-        name = await _service.lookupNameFromDeviceContacts(phone) ?? '';
+      final fromContacts = await _service.lookupNameFromDeviceContacts(phone);
+      if (fromContacts != null && fromContacts.isNotEmpty) {
+        name = fromContacts;
+      } else if (name.isEmpty || name == phone || RegExp(r'^[A-Z0-9.\-_+]+$').hasMatch(name)) {
+        name = '';
       }
       if (name.isEmpty) {
         if (!mounted) return;
@@ -245,7 +248,7 @@ class _CallSyncPageState extends State<CallSyncPage> {
                                       Text(hasName ? name : phone, style: Theme.of(context).textTheme.titleMedium),
                                       if (hasName) Text(phone, style: Theme.of(context).textTheme.bodySmall),
                                       Text(
-                                        '${_typeLabel(type)}  •  ${_timeLabel(e['timestamp'] as int?)}',
+                                        '${_typeLabel(type)}  •  ${_timeLabel(e['timestamp'] as int?)}  •  ${Customer.phoneTypeLabel(phone)}',
                                         style: TextStyle(color: _typeColor(type), fontSize: 12),
                                       ),
                                     ],

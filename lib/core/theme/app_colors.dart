@@ -1,18 +1,25 @@
 import 'package:flutter/material.dart';
 
 class AppColors {
-  static const Color background = Color(0xFF09090B);
-  static const Color surface = Color(0xFF18181B);
-  static const Color surfaceLight = Color(0xFF27272A);
-  static const Color primary = Color(0xFF2DD4BF);
-  static const Color primaryDark = Color(0xFF14B8A6);
-  static const Color textPrimary = Color(0xFFFAFAFA);
-  static const Color textSecondary = Color(0xFFA1A1AA);
-  static const Color textMuted = Color(0xFF71717A);
-  static const Color success = Color(0xFF4ADE80);
-  static const Color warning = Color(0xFFFBBF24);
-  static const Color danger = Color(0xFFF87171);
-  static const Color info = Color(0xFF60A5FA);
-  static const Color border = Color(0xFF27272A);
-  static const Color borderLight = Color(0xFF3F3F46);
+  // Light modern (reference style)
+  static const Color background = Color(0xFFF5F3FF);
+  static const Color surface = Color(0xFFFFFFFF);
+  static const Color surfaceLight = Color(0xFFF0EEFF);
+  static const Color primary = Color(0xFF7C6CF0);
+  static const Color primaryDark = Color(0xFF5B4FD6);
+  static const Color accent = Color(0xFF22C55E);
+  static const Color textPrimary = Color(0xFF1E1B2E);
+  static const Color textSecondary = Color(0xFF6B7280);
+  static const Color textMuted = Color(0xFF9CA3AF);
+  static const Color success = Color(0xFF22C55E);
+  static const Color warning = Color(0xFFF59E0B);
+  static const Color danger = Color(0xFFEF4444);
+  static const Color info = Color(0xFF3B82F6);
+  static const Color border = Color(0xFFE8E5F5);
+  static const Color borderLight = Color(0xFFF0EEFF);
+  static const Color chipBg = Color(0xFFEEF2FF);
+  static const Color avatar1 = Color(0xFFDDD6FE);
+  static const Color avatar2 = Color(0xFFFBCFE8);
+  static const Color avatar3 = Color(0xFFBBF7D0);
+  static const Color avatar4 = Color(0xFFBAE6FD);
 }
