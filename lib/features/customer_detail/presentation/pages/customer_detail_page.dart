@@ -4,6 +4,8 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:customer_callbook/core/theme/app_colors.dart';
 import 'package:customer_callbook/core/theme/tag_colors.dart';
 import 'package:customer_callbook/data/models/customer.dart';
+import 'package:customer_callbook/data/models/call_record.dart';
+import 'package:customer_callbook/core/utils/jalali.dart';
 import 'package:customer_callbook/data/services/customer_service.dart';
 import 'package:customer_callbook/features/add_customer/presentation/pages/add_customer_page.dart';
 import 'package:customer_callbook/shared/widgets/elevated_icon_button.dart';
@@ -20,12 +22,19 @@ class _CustomerDetailPageState extends State<CustomerDetailPage> {
   late Customer _customer;
   final _service = CustomerService();
   final _noteCtrl = TextEditingController();
+  List<CallRecord> _history = [];
 
   @override
   void initState() {
     super.initState();
     _customer = widget.customer;
     _noteCtrl.text = _customer.note ?? '';
+    _loadHistory();
+  }
+
+  Future<void> _loadHistory() async {
+    final h = await _service.getCallHistory(phone: _customer.phone, limit: 30);
+    if (mounted) setState(() => _history = h);
   }
 
   @override
@@ -42,6 +51,7 @@ class _CustomerDetailPageState extends State<CustomerDetailPage> {
       await launchUrl(uri);
       final u = await _service.recordCall(_customer.phone, name: _customer.name);
       setState(() => _customer = u);
+      _loadHistory();
     }
   }
 
@@ -263,6 +273,58 @@ class _CustomerDetailPageState extends State<CustomerDetailPage> {
               width: double.infinity,
               child: ElevatedButton(onPressed: _saveNote, child: const Text('ذخیره یادداشت')),
             ),
+            const SizedBox(height: 28),
+            Align(
+              alignment: Alignment.centerRight,
+              child: Text('سابقه تماس‌ها', style: Theme.of(context).textTheme.titleMedium),
+            ),
+            const SizedBox(height: 10),
+            if (_history.isEmpty)
+              Text('سابقه‌ای ثبت نشده', style: Theme.of(context).textTheme.bodySmall)
+            else
+              ..._history.map((r) {
+                final color = r.type == 1
+                    ? AppColors.accent
+                    : r.type == 3
+                        ? AppColors.danger
+                        : AppColors.info;
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: AppColors.surfaceElevated,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: AppColors.border),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          r.type == 1
+                              ? Icons.call_received_rounded
+                              : r.type == 3
+                                  ? Icons.call_missed_rounded
+                                  : Icons.call_made_rounded,
+                          color: color,
+                          size: 20,
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(r.typeLabel, style: TextStyle(fontWeight: FontWeight.w600, color: color, fontSize: 13)),
+                              Text(Jalali.format(r.at, withTime: true), style: Theme.of(context).textTheme.bodySmall),
+                            ],
+                          ),
+                        ),
+                        if (r.durationSec > 0)
+                          Text('${r.durationSec}s', style: Theme.of(context).textTheme.bodySmall),
+                      ],
+                    ),
+                  ),
+                );
+              }),
           ],
         ),
       ),

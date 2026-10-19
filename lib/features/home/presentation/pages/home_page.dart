@@ -6,11 +6,13 @@ import 'package:customer_callbook/core/theme/app_colors.dart';
 import 'package:customer_callbook/core/theme/theme_controller.dart';
 import 'package:customer_callbook/core/theme/tag_colors.dart';
 import 'package:customer_callbook/data/models/customer.dart';
+import 'package:customer_callbook/core/utils/jalali.dart';
 import 'package:customer_callbook/data/services/customer_service.dart';
 import 'package:customer_callbook/features/phonebook/presentation/pages/phonebook_page.dart';
 import 'package:customer_callbook/features/customer_detail/presentation/pages/customer_detail_page.dart';
 import 'package:customer_callbook/features/call_sync/presentation/pages/call_sync_page.dart';
 import 'package:customer_callbook/features/add_customer/presentation/pages/add_customer_page.dart';
+import 'package:customer_callbook/features/history/presentation/pages/history_page.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -85,6 +87,7 @@ class _HomePageState extends State<HomePage> {
                 },
               ),
               PhonebookPage(onChanged: _load),
+              const HistoryPage(),
               _SettingsTab(onReload: _load, customers: _customers),
             ],
           ),
@@ -102,6 +105,7 @@ class _HomePageState extends State<HomePage> {
             items: const [
               BottomNavigationBarItem(icon: Icon(Icons.phone_outlined), activeIcon: Icon(Icons.phone_rounded), label: 'تماس‌ها'),
               BottomNavigationBarItem(icon: Icon(Icons.people_outline), activeIcon: Icon(Icons.people_rounded), label: 'مشتریان'),
+              BottomNavigationBarItem(icon: Icon(Icons.history_outlined), activeIcon: Icon(Icons.history_rounded), label: 'سابقه'),
               BottomNavigationBarItem(icon: Icon(Icons.settings_outlined), activeIcon: Icon(Icons.settings_rounded), label: 'تنظیمات'),
             ],
           ),
@@ -141,12 +145,7 @@ class _CallsTab extends StatelessWidget {
 
   String _timeAgo(DateTime? dt) {
     if (dt == null) return '';
-    final d = DateTime.now().difference(dt);
-    if (d.inMinutes < 1) return 'همین الان';
-    if (d.inMinutes < 60) return '${d.inMinutes} دقیقه پیش';
-    if (d.inHours < 24) return '${d.inHours} ساعت پیش';
-    if (d.inDays == 1) return 'دیروز';
-    return '${d.inDays} روز پیش';
+    return Jalali.timeAgoOrJalali(dt);
   }
 
   Color _avatarColor(String name) {
@@ -473,7 +472,7 @@ class _SettingsTab extends StatelessWidget {
           }
           await Share.share(buf.toString(), subject: 'لیست مشتریان');
         }),
-        _tile(context, Icons.info_rounded, AppColors.textMuted, 'درباره برنامه', 'نسخه ۱.۱۰.۰ — دفترچه مشتریان', null),
+        _tile(context, Icons.info_rounded, AppColors.textMuted, 'درباره برنامه', 'نسخه ۱.۱۱.۰ — دفترچه مشتریان', null),
       ],
     );
   }

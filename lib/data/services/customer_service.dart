@@ -2,6 +2,8 @@ import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:customer_callbook/data/services/contact_cache.dart';
 import 'package:customer_callbook/data/models/customer.dart';
+import 'package:customer_callbook/data/models/call_record.dart';
+import 'package:uuid/uuid.dart';
 
 class CustomerService {
   static const _key = 'customers_v2';
@@ -71,7 +73,7 @@ class CustomerService {
     }
   }
 
-  Future<Customer> recordCall(String phone, {String? name}) async {
+  Future<Customer> recordCall(String phone, {String? name, int type = 2}) async {
     final existing = await findByPhone(phone);
     final now = DateTime.now();
     if (existing != null) {
@@ -82,6 +84,7 @@ class CustomerService {
         name: (name != null && name.isNotEmpty && !_isJunkName(name)) ? name : existing.name,
       );
       await update(updated);
+      await addCallRecord(phone: phone, customerId: updated.id, type: type);
       return updated;
     }
     final resolved = await lookupNameFromDeviceContacts(phone);
@@ -95,7 +98,9 @@ class CustomerService {
       firstCallAt: now,
       lastCallAt: now,
     );
-    return add(c);
+    final saved = await add(c);
+    await addCallRecord(phone: phone, customerId: saved.id, type: type);
+    return saved;
   }
 
   /// نام‌های بی‌معنی اپراتور/سیستم را رد می‌کند
@@ -127,4 +132,54 @@ class CustomerService {
           Customer.normalizePhone(c.phone).contains(Customer.normalizePhone(q));
     }).toList();
   }
+
+  static const _callsKey = 'call_records_v1';
+
+  Future<List<CallRecord>> getCallHistory({String? phone, String? customerId, int limit = 50}) async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_callsKey);
+    if (raw == null || raw.isEmpty) return [];
+    var list = (jsonDecode(raw) as List)
+        .map((e) => CallRecord.fromJson(Map<String, dynamic>.from(e)))
+        .toList();
+    if (phone != null) {
+      final n = Customer.normalizePhone(phone);
+      list = list.where((c) => Customer.normalizePhone(c.phone) == n).toList();
+    }
+    if (customerId != null) {
+      list = list.where((c) => c.customerId == customerId).toList();
+    }
+    list.sort((a, b) => b.at.compareTo(a.at));
+    if (list.length > limit) list = list.sublist(0, limit);
+    return list;
+  }
+
+  Future<void> addCallRecord({
+    required String phone,
+    String? customerId,
+    int type = 2,
+    int durationSec = 0,
+    DateTime? at,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_callsKey);
+    final list = raw == null || raw.isEmpty
+        ? <Map<String, dynamic>>[]
+        : List<Map<String, dynamic>>.from(jsonDecode(raw) as List);
+    final rec = CallRecord(
+      id: const Uuid().v4(),
+      phone: Customer.normalizePhone(phone),
+      customerId: customerId,
+      type: type,
+      at: at ?? DateTime.now(),
+      durationSec: durationSec,
+    );
+    list.insert(0, rec.toJson());
+    // cap storage for battery/storage
+    while (list.length > 300) {
+      list.removeLast();
+    }
+    await prefs.setString(_callsKey, jsonEncode(list));
+  }
+
 }

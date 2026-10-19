@@ -115,7 +115,9 @@ class _CallSyncPageState extends State<CallSyncPage> {
 
     final existing = await _service.findByPhone(phone);
     if (existing != null) {
-      await _service.recordCall(phone, name: existing.name);
+      final t = (e['type'] ?? '').toString().toLowerCase();
+      final typeInt = t.contains('miss') || t.contains('از') ? 3 : t.contains('in') || t.contains('ورود') ? 1 : 2;
+      await _service.recordCall(phone, name: existing.name, type: typeInt);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('تماس برای «${existing.name}» ثبت شد'), backgroundColor: AppColors.success),
@@ -137,7 +139,7 @@ class _CallSyncPageState extends State<CallSyncPage> {
         );
       } else {
         final ts = e['timestamp'] as int?;
-        await _service.add(Customer(
+        final __c = await _service.add(Customer(
           name: name,
           phone: phone,
           callCount: 1,
@@ -170,7 +172,7 @@ class _CallSyncPageState extends State<CallSyncPage> {
         name = await _service.lookupNameFromDeviceContacts(phone) ?? phone;
       }
       final ts = e['timestamp'] as int?;
-      await _service.add(Customer(
+      final __c = await _service.add(Customer(
         name: name,
         phone: phone,
         callCount: 1,
