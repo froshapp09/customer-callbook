@@ -385,9 +385,18 @@ class _InfoCol extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        Text(value, style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: AppColors.primary), textAlign: TextAlign.center),
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(
+            value,
+            maxLines: 1,
+            softWrap: false,
+            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: AppColors.primary),
+            textAlign: TextAlign.center,
+          ),
+        ),
         const SizedBox(height: 4),
-        Text(title, style: Theme.of(context).textTheme.bodySmall, textAlign: TextAlign.center),
+        Text(title, style: Theme.of(context).textTheme.bodySmall, textAlign: TextAlign.center, maxLines: 1),
       ],
     );
   }

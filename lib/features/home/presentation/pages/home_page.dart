@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -15,6 +16,7 @@ import 'package:customer_callbook/features/add_customer/presentation/pages/add_c
 import 'package:customer_callbook/features/history/presentation/pages/history_page.dart';
 import 'package:customer_callbook/services/call_listener_service.dart';
 import 'package:customer_callbook/data/services/note_templates_service.dart';
+import 'package:customer_callbook/data/services/backup_service.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -519,6 +521,10 @@ class _SettingsTab extends StatelessWidget {
         _tile(context, Icons.sticky_note_2_rounded, const Color(0xFF38BDF8), 'یادداشت‌های آماده', 'انتخاب سریع هنگام ذخیره مشتری', () {
           Navigator.push(context, MaterialPageRoute(builder: (_) => const _NoteTemplatesPage()));
         }),
+        _tile(context, Icons.backup_rounded, const Color(0xFF34D399), 'پشتیبان شماره‌ها', 'ذخیره و بازیابی بعد از نصب مجدد', () {
+          Navigator.push(context, MaterialPageRoute(builder: (_) => _BackupPage(onDone: onReload)));
+        }),
+        const SizedBox(height: 10),
         _tile(context, Icons.upload_file_rounded, const Color(0xFFA78BFA), 'خروجی لیست مشتریان', 'CSV برای پنل پیامک', () async {
           if (customers.isEmpty) {
             ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('مشتری‌ای نیست')));
@@ -530,7 +536,7 @@ class _SettingsTab extends StatelessWidget {
           }
           await Share.share(buf.toString(), subject: 'لیست مشتریان');
         }),
-        _tile(context, Icons.info_rounded, AppColors.textMuted, 'درباره برنامه', 'نسخه ۱.۱۷.۱ (۳۱) — دفترچه مشتریان', null),
+        _tile(context, Icons.info_rounded, AppColors.textMuted, 'درباره برنامه', 'نسخه ۱.۱۷.۲ (۳۲) — دفترچه مشتریان', null),
       ],
     );
   }
@@ -797,7 +803,7 @@ class _NoteTemplatesPageState extends State<_NoteTemplatesPage> {
           : ListView(
               padding: const EdgeInsets.all(16),
               children: [
-                Text('این متن‌ها در صفحه مشتری قابل انتخاب هستند و هنگام تماس در اعلان هم می‌آیند.',
+                Text('پیش‌فرض اولیه را می‌توانید حذف کنید و متن خودتان بسازید. در صفحه مشتری با یک ضربه انتخاب می‌شوند.',
                     style: Theme.of(context).textTheme.bodySmall),
                 const SizedBox(height: 12),
                 Row(
@@ -825,6 +831,134 @@ class _NoteTemplatesPageState extends State<_NoteTemplatesPage> {
                     )),
               ],
             ),
+    );
+  }
+}
+
+class _BackupPage extends StatefulWidget {
+  final VoidCallback onDone;
+  const _BackupPage({required this.onDone});
+  @override
+  State<_BackupPage> createState() => _BackupPageState();
+}
+
+class _BackupPageState extends State<_BackupPage> {
+  final _importCtrl = TextEditingController();
+  bool _busy = false;
+  String? _msg;
+
+  @override
+  void dispose() {
+    _importCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _export() async {
+    setState(() { _busy = true; _msg = null; });
+    try {
+      final json = await BackupService.instance.exportJson();
+      await Clipboard.setData(ClipboardData(text: json));
+      if (mounted) {
+        setState(() => _msg = 'پشتیبان کپی شد. در یادداشت‌های گوشی یا فایل ذخیره کنید.');
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('JSON پشتیبان در کلیپ‌بورد کپی شد')),
+        );
+      }
+    } catch (e) {
+      setState(() => _msg = 'خطا: $e');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _exportCsv() async {
+    setState(() { _busy = true; _msg = null; });
+    try {
+      final csv = await BackupService.instance.exportCsv();
+      await Clipboard.setData(ClipboardData(text: csv));
+      if (mounted) {
+        setState(() => _msg = 'CSV کپی شد.');
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('CSV در کلیپ‌بورد کپی شد')),
+        );
+      }
+    } catch (e) {
+      setState(() => _msg = 'خطا: $e');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _import() async {
+    final raw = _importCtrl.text.trim();
+    if (raw.isEmpty) return;
+    setState(() { _busy = true; _msg = null; });
+    try {
+      final n = await BackupService.instance.importJson(raw);
+      widget.onDone();
+      if (mounted) {
+        setState(() => _msg = '$n مشتری بازیابی شد.');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('$n مشتری بازیابی شد')),
+        );
+      }
+    } catch (e) {
+      setState(() => _msg = 'خطا در بازیابی: $e');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('پشتیبان شماره‌ها')),
+      body: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          Text(
+            'قبل از حذف اپ یا نصب نسخه جدید، پشتیبان بگیرید. بعد از نصب، همینجا بازیابی کنید.',
+            style: Theme.of(context).textTheme.bodyMedium,
+          ),
+          const SizedBox(height: 16),
+          ElevatedButton.icon(
+            onPressed: _busy ? null : _export,
+            icon: const Icon(Icons.copy_all),
+            label: const Text('کپی پشتیبان کامل (JSON)'),
+          ),
+          const SizedBox(height: 8),
+          OutlinedButton.icon(
+            onPressed: _busy ? null : _exportCsv,
+            icon: const Icon(Icons.table_chart_outlined),
+            label: const Text('کپی خروجی CSV'),
+          ),
+          const SizedBox(height: 24),
+          Text('بازیابی از JSON', style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 8),
+          TextField(
+            controller: _importCtrl,
+            maxLines: 8,
+            decoration: const InputDecoration(
+              hintText: 'متن JSON پشتیبان را اینجا بچسبانید...',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          const SizedBox(height: 12),
+          ElevatedButton.icon(
+            onPressed: _busy ? null : _import,
+            icon: const Icon(Icons.restore),
+            label: const Text('بازیابی مشتریان'),
+          ),
+          if (_busy) const Padding(
+            padding: EdgeInsets.all(16),
+            child: Center(child: CircularProgressIndicator()),
+          ),
+          if (_msg != null) ...[
+            const SizedBox(height: 12),
+            Text(_msg!, style: TextStyle(color: AppColors.primary)),
+          ],
+        ],
+      ),
     );
   }
 }
