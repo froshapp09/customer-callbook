@@ -9,6 +9,7 @@ import 'package:customer_callbook/core/utils/jalali.dart';
 import 'package:customer_callbook/data/services/customer_service.dart';
 import 'package:customer_callbook/features/add_customer/presentation/pages/add_customer_page.dart';
 import 'package:customer_callbook/shared/widgets/elevated_icon_button.dart';
+import 'package:customer_callbook/data/services/note_templates_service.dart';
 
 class CustomerDetailPage extends StatefulWidget {
   final Customer customer;
@@ -23,6 +24,7 @@ class _CustomerDetailPageState extends State<CustomerDetailPage> {
   final _service = CustomerService();
   final _noteCtrl = TextEditingController();
   List<CallRecord> _history = [];
+  List<String> _templates = [];
 
   @override
   void initState() {
@@ -34,7 +36,11 @@ class _CustomerDetailPageState extends State<CustomerDetailPage> {
 
   Future<void> _loadHistory() async {
     final h = await _service.getCallHistory(phone: _customer.phone, limit: 30);
-    if (mounted) setState(() => _history = h);
+    final tpls = await NoteTemplatesService.instance.getAll();
+    if (mounted) setState(() {
+      _history = h;
+      _templates = tpls;
+    });
   }
 
   @override
@@ -128,16 +134,12 @@ class _CustomerDetailPageState extends State<CustomerDetailPage> {
 
   String _fmt(DateTime? dt) {
     if (dt == null) return '—';
-    return '${dt.year}/${dt.month.toString().padLeft(2, '0')}/${dt.day.toString().padLeft(2, '0')}';
+    return Jalali.format(dt, withTime: false);
   }
 
   String _timeAgo(DateTime? dt) {
     if (dt == null) return '—';
-    final d = DateTime.now().difference(dt);
-    if (d.inMinutes < 60) return '${d.inMinutes} دقیقه پیش';
-    if (d.inHours < 24) return '${d.inHours} ساعت پیش';
-    if (d.inDays < 7) return '${d.inDays} روز پیش';
-    return _fmt(dt);
+    return Jalali.timeAgoOrJalali(dt);
   }
 
   Color _avatarColor(String name) {
@@ -263,6 +265,28 @@ class _CustomerDetailPageState extends State<CustomerDetailPage> {
               child: Text('یادداشت', style: Theme.of(context).textTheme.titleMedium),
             ),
             const SizedBox(height: 10),
+            if (_templates.isNotEmpty)
+              Align(
+                alignment: Alignment.centerRight,
+                child: Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  alignment: WrapAlignment.end,
+                  children: _templates.map((tpl) {
+                    return ActionChip(
+                      label: Text(tpl, style: const TextStyle(fontSize: 12)),
+                      onPressed: () {
+                        final cur = _noteCtrl.text.trim();
+                        _noteCtrl.text = cur.isEmpty ? tpl : '$cur\n$tpl';
+                        _noteCtrl.selection = TextSelection.fromPosition(
+                          TextPosition(offset: _noteCtrl.text.length),
+                        );
+                      },
+                    );
+                  }).toList(),
+                ),
+              ),
+            if (_templates.isNotEmpty) const SizedBox(height: 10),
             TextField(
               controller: _noteCtrl,
               maxLines: 4,

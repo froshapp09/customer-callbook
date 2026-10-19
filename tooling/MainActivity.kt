@@ -1,31 +1,129 @@
 package ir.apadanasleep.customer_callbook
 
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.database.Cursor
+import android.os.Build
 import android.provider.CallLog
+import android.telephony.TelephonyManager
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
+import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterActivity() {
-    private val channelName = "ir.apadanasleep.customer_callbook/call_log"
+    private val methodChannelName = "ir.apadanasleep.customer_callbook/call_log"
+    private val eventChannelName = "ir.apadanasleep.customer_callbook/phone_state"
+
+    private var eventSink: EventChannel.EventSink? = null
+    private var receiver: BroadcastReceiver? = null
+    private var lastState = TelephonyManager.CALL_STATE_IDLE
+    private var lastNumber: String? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
-        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, channelName)
+
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, methodChannelName)
             .setMethodCallHandler { call, result ->
-                if (call.method == "getRecentCalls") {
-                    try {
-                        val days = (call.argument<Int>("days") ?: 2)
-                        result.success(getRecentCalls(days))
-                    } catch (e: SecurityException) {
-                        result.error("PERMISSION", "need call log permission", null)
-                    } catch (e: Exception) {
-                        result.error("ERROR", e.message, null)
+                when (call.method) {
+                    "getRecentCalls" -> {
+                        try {
+                            val days = call.argument<Int>("days") ?: 2
+                            result.success(getRecentCalls(days))
+                        } catch (e: SecurityException) {
+                            result.error("PERMISSION", "need call log permission", null)
+                        } catch (e: Exception) {
+                            result.error("ERROR", e.message, null)
+                        }
                     }
-                } else {
-                    result.notImplemented()
+                    "startPhoneListen" -> {
+                        try {
+                            startReceiver()
+                            result.success(true)
+                        } catch (e: Exception) {
+                            result.error("ERROR", e.message, null)
+                        }
+                    }
+                    "stopPhoneListen" -> {
+                        stopReceiver()
+                        result.success(true)
+                    }
+                    else -> result.notImplemented()
                 }
             }
+
+        EventChannel(flutterEngine.dartExecutor.binaryMessenger, eventChannelName)
+            .setStreamHandler(object : EventChannel.StreamHandler {
+                override fun onListen(arguments: Any?, events: EventChannel.EventSink?) {
+                    eventSink = events
+                    try {
+                        startReceiver()
+                    } catch (e: Exception) {
+                        events?.error("ERROR", e.message, null)
+                    }
+                }
+
+                override fun onCancel(arguments: Any?) {
+                    eventSink = null
+                    // keep receiver if method-channel started; only stop on stopPhoneListen
+                }
+            })
+    }
+
+    private fun startReceiver() {
+        if (receiver != null) return
+        receiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context?, intent: Intent?) {
+                if (intent?.action != TelephonyManager.ACTION_PHONE_STATE_CHANGED) return
+                val stateStr = intent.getStringExtra(TelephonyManager.EXTRA_STATE) ?: return
+                val number = intent.getStringExtra(TelephonyManager.EXTRA_INCOMING_NUMBER)
+
+                val state = when (stateStr) {
+                    TelephonyManager.EXTRA_STATE_RINGING -> TelephonyManager.CALL_STATE_RINGING
+                    TelephonyManager.EXTRA_STATE_OFFHOOK -> TelephonyManager.CALL_STATE_OFFHOOK
+                    TelephonyManager.EXTRA_STATE_IDLE -> TelephonyManager.CALL_STATE_IDLE
+                    else -> return
+                }
+
+                if (state == TelephonyManager.CALL_STATE_RINGING) {
+                    lastNumber = number
+                    val map = hashMapOf<String, Any?>(
+                        "status" to "incoming",
+                        "number" to (number ?: lastNumber ?: "")
+                    )
+                    runOnUiThread { eventSink?.success(map) }
+                } else if (state == TelephonyManager.CALL_STATE_IDLE && lastState != TelephonyManager.CALL_STATE_IDLE) {
+                    val map = hashMapOf<String, Any?>(
+                        "status" to "idle",
+                        "number" to (lastNumber ?: "")
+                    )
+                    runOnUiThread { eventSink?.success(map) }
+                    lastNumber = null
+                }
+                lastState = state
+            }
+        }
+        val filter = IntentFilter(TelephonyManager.ACTION_PHONE_STATE_CHANGED)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(receiver, filter, Context.RECEIVER_EXPORTED)
+        } else {
+            registerReceiver(receiver, filter)
+        }
+    }
+
+    private fun stopReceiver() {
+        try {
+            receiver?.let { unregisterReceiver(it) }
+        } catch (_: Exception) {
+        }
+        receiver = null
+    }
+
+    override fun onDestroy() {
+        stopReceiver()
+        super.onDestroy()
     }
 
     private fun getRecentCalls(days: Int): List<Map<String, Any?>> {

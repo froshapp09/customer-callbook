@@ -115,12 +115,10 @@ class _CallSyncPageState extends State<CallSyncPage> {
 
     final existing = await _service.findByPhone(phone);
     if (existing != null) {
-      final t = (e['type'] ?? '').toString().toLowerCase();
-      final typeInt = t.contains('miss') || t.contains('از') ? 3 : t.contains('in') || t.contains('ورود') ? 1 : 2;
-      await _service.recordCall(phone, name: existing.name, type: typeInt);
+      // فقط یادآوری: قبلاً در دفترچه هست — تماس گوشی را به عنوان تماس اپ ثبت نکن
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('تماس برای «${existing.name}» ثبت شد'), backgroundColor: AppColors.success),
+          SnackBar(content: Text('«${existing.name}» از قبل در دفترچه است'), backgroundColor: AppColors.info),
         );
       }
     } else {
@@ -138,13 +136,13 @@ class _CallSyncPageState extends State<CallSyncPage> {
           MaterialPageRoute(builder: (_) => AddCustomerPage(initialPhone: phone)),
         );
       } else {
-        final ts = e['timestamp'] as int?;
+        // فقط مشتری — جزو تماس اپ / سابقه تماس حساب نشود
         final __c = await _service.add(Customer(
           name: name,
           phone: phone,
-          callCount: 1,
-          firstCallAt: ts != null ? DateTime.fromMillisecondsSinceEpoch(ts) : DateTime.now(),
-          lastCallAt: ts != null ? DateTime.fromMillisecondsSinceEpoch(ts) : DateTime.now(),
+          callCount: 0,
+          firstCallAt: null,
+          lastCallAt: null,
         ));
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -171,13 +169,12 @@ class _CallSyncPageState extends State<CallSyncPage> {
       if (name.isEmpty || name == phone) {
         name = await _service.lookupNameFromDeviceContacts(phone) ?? phone;
       }
-      final ts = e['timestamp'] as int?;
       final __c = await _service.add(Customer(
         name: name,
         phone: phone,
-        callCount: 1,
-        firstCallAt: ts != null ? DateTime.fromMillisecondsSinceEpoch(ts) : DateTime.now(),
-        lastCallAt: ts != null ? DateTime.fromMillisecondsSinceEpoch(ts) : DateTime.now(),
+        callCount: 0,
+        firstCallAt: null,
+        lastCallAt: null,
       ));
       added++;
     }

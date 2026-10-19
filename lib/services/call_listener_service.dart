@@ -1,23 +1,24 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
-import 'package:phone_state/phone_state.dart';
+import 'package:flutter/services.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:customer_callbook/data/services/customer_service.dart';
 import 'package:customer_callbook/data/models/customer.dart';
 
-/// شنود تماس ورودی + اعلان نام مشتری
 class CallListenerService {
   static final CallListenerService instance = CallListenerService._();
   factory CallListenerService() => instance;
   CallListenerService._();
 
   static const _prefKey = 'call_detect_enabled';
+  static const _eventChannel = EventChannel('ir.apadanasleep.customer_callbook/phone_state');
+  static const _methodChannel = MethodChannel('ir.apadanasleep.customer_callbook/call_log');
+
   final _customerService = CustomerService();
   final _notifications = FlutterLocalNotificationsPlugin();
-  StreamSubscription<PhoneState>? _sub;
+  StreamSubscription? _sub;
   bool _isListening = false;
   bool _notifReady = false;
   bool get isListening => _isListening;
@@ -36,7 +37,8 @@ class CallListenerService {
     if (_notifReady) return;
     const android = AndroidInitializationSettings('@mipmap/ic_launcher');
     await _notifications.initialize(const InitializationSettings(android: android));
-    final androidPlugin = _notifications.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+    final androidPlugin =
+        _notifications.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
     await androidPlugin?.createNotificationChannel(
       const AndroidNotificationChannel(
         'incoming_calls',
@@ -60,39 +62,31 @@ class CallListenerService {
   Future<bool> requestPermissions() async {
     final phone = await Permission.phone.request();
     await Permission.notification.request();
-    // call log helps match numbers
-    await Permission.phone.request();
-    try {
-      // ignore: deprecated_member_use
-      await Permission.phone.request();
-    } catch (_) {}
     return phone.isGranted;
   }
 
-  /// از تنظیمات یا استارت اپ
   Future<bool> enableAndStart() async {
     await initNotifications();
     final ok = await requestPermissions();
     if (!ok) return false;
     await setEnabled(true);
     await startListening();
-    await _showMonitorNotification();
+    if (_isListening) await _showMonitorNotification();
     return _isListening;
   }
 
   Future<void> disableAndStop() async {
     await setEnabled(false);
-    stopListening();
+    await stopListening();
     await _notifications.cancel(9001);
   }
 
-  /// اگر قبلاً فعال شده، دوباره شروع کن (مثلاً بعد از باز شدن اپ)
   Future<void> restoreIfEnabled() async {
     if (await isEnabled()) {
       await initNotifications();
       if (await Permission.phone.isGranted) {
         await startListening();
-        await _showMonitorNotification();
+        if (_isListening) await _showMonitorNotification();
       }
     }
   }
@@ -104,30 +98,43 @@ class CallListenerService {
       debugPrint('CallListener: no phone permission');
       return;
     }
-    _isListening = true;
+
+    try {
+      await _methodChannel.invokeMethod('startPhoneListen');
+    } catch (e) {
+      debugPrint('startPhoneListen native: $e');
+    }
+
     _sub?.cancel();
-    _sub = PhoneState.stream.listen((event) async {
+    _sub = _eventChannel.receiveBroadcastStream().listen((event) async {
       try {
-        if (event.status != PhoneStateStatus.CALL_INCOMING) return;
-        final number = (event.number ?? '').trim();
+        if (event is! Map) return;
+        final status = event['status']?.toString() ?? '';
+        if (status != 'incoming') return;
+        final number = (event['number'] ?? '').toString().trim();
         if (number.isEmpty) return;
 
         final customer = await _customerService.findByPhone(number);
         await _customerService.recordCall(number, name: customer?.name, type: 1);
         await _showCallNotification(number, customer);
       } catch (e) {
-        debugPrint('CallListener error: $e');
+        debugPrint('CallListener handle: $e');
       }
     }, onError: (e) {
       debugPrint('CallListener stream error: $e');
     });
-    debugPrint('CallListener: started');
+
+    _isListening = true;
+    debugPrint('CallListener: native stream started');
   }
 
-  void stopListening() {
+  Future<void> stopListening() async {
     _sub?.cancel();
     _sub = null;
     _isListening = false;
+    try {
+      await _methodChannel.invokeMethod('stopPhoneListen');
+    } catch (_) {}
   }
 
   Future<void> _showMonitorNotification() async {
@@ -151,8 +158,11 @@ class CallListenerService {
 
   Future<void> _showCallNotification(String number, Customer? customer) async {
     final title = customer != null ? 'تماس: ${customer.name}' : 'تماس ورودی';
+    final note = (customer?.note ?? '').trim();
     final body = customer != null
-        ? '${Customer.displayPhone(number)} · ${customer.callCount} تماس قبلی · ${customer.tag}'
+        ? (note.isNotEmpty
+            ? '${Customer.displayPhone(number)} · $note'
+            : '${Customer.displayPhone(number)} · ${customer.callCount} تماس · ${customer.tag}')
         : '${Customer.displayPhone(number)} · در دفترچه نیست';
 
     const androidDetails = AndroidNotificationDetails(

@@ -14,6 +14,7 @@ import 'package:customer_callbook/features/call_sync/presentation/pages/call_syn
 import 'package:customer_callbook/features/add_customer/presentation/pages/add_customer_page.dart';
 import 'package:customer_callbook/features/history/presentation/pages/history_page.dart';
 import 'package:customer_callbook/services/call_listener_service.dart';
+import 'package:customer_callbook/data/services/note_templates_service.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -89,11 +90,14 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  int get _todayCount {
+    int get _todayCount {
+    // فقط تماس‌هایی که از خود اپ زده/ثبت شده‌اند (lastCallAt + callCount>0)
     final now = DateTime.now();
     return _customers.where((c) {
+      if (c.callCount <= 0) return false;
       final d = c.lastCallAt;
-      return d != null && d.year == now.year && d.month == now.month && d.day == now.day;
+      if (d == null) return false;
+      return d.year == now.year && d.month == now.month && d.day == now.day;
     }).length;
   }
 
@@ -203,7 +207,7 @@ class _CallsTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final recent = customers.where((c) => c.lastCallAt != null).toList()
+    final recent = customers.where((c) => c.lastCallAt != null && c.callCount > 0).toList()
       ..sort((a, b) => b.lastCallAt!.compareTo(a.lastCallAt!));
 
     return RefreshIndicator(
@@ -511,6 +515,10 @@ class _SettingsTab extends StatelessWidget {
         _tile(context, Icons.palette_rounded, AppColors.warning, 'رنگ دسته‌بندی‌ها', 'مشتری، همکار، سایر', () {
           Navigator.push(context, MaterialPageRoute(builder: (_) => const _TagColorPage()));
         }),
+        const SizedBox(height: 10),
+        _tile(context, Icons.sticky_note_2_rounded, const Color(0xFF38BDF8), 'یادداشت‌های آماده', 'انتخاب سریع هنگام ذخیره مشتری', () {
+          Navigator.push(context, MaterialPageRoute(builder: (_) => const _NoteTemplatesPage()));
+        }),
         _tile(context, Icons.upload_file_rounded, const Color(0xFFA78BFA), 'خروجی لیست مشتریان', 'CSV برای پنل پیامک', () async {
           if (customers.isEmpty) {
             ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('مشتری‌ای نیست')));
@@ -522,7 +530,7 @@ class _SettingsTab extends StatelessWidget {
           }
           await Share.share(buf.toString(), subject: 'لیست مشتریان');
         }),
-        _tile(context, Icons.info_rounded, AppColors.textMuted, 'درباره برنامه', 'نسخه ۱.۱۳.۰ — دفترچه مشتریان', null),
+        _tile(context, Icons.info_rounded, AppColors.textMuted, 'درباره برنامه', 'نسخه ۱.۱۷.۱ (۳۱) — دفترچه مشتریان', null),
       ],
     );
   }
@@ -735,6 +743,88 @@ class _CallDetectTileState extends State<_CallDetectTile> {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _NoteTemplatesPage extends StatefulWidget {
+  const _NoteTemplatesPage();
+  @override
+  State<_NoteTemplatesPage> createState() => _NoteTemplatesPageState();
+}
+
+class _NoteTemplatesPageState extends State<_NoteTemplatesPage> {
+  List<String> _items = [];
+  final _ctrl = TextEditingController();
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final list = await NoteTemplatesService.instance.getAll();
+    if (mounted) setState(() { _items = list; _loading = false; });
+  }
+
+  Future<void> _add() async {
+    final t = _ctrl.text.trim();
+    if (t.isEmpty) return;
+    await NoteTemplatesService.instance.add(t);
+    _ctrl.clear();
+    await _load();
+  }
+
+  Future<void> _remove(String t) async {
+    await NoteTemplatesService.instance.remove(t);
+    await _load();
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('یادداشت‌های آماده')),
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : ListView(
+              padding: const EdgeInsets.all(16),
+              children: [
+                Text('این متن‌ها در صفحه مشتری قابل انتخاب هستند و هنگام تماس در اعلان هم می‌آیند.',
+                    style: Theme.of(context).textTheme.bodySmall),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _ctrl,
+                        decoration: const InputDecoration(hintText: 'متن جدید...'),
+                        onSubmitted: (_) => _add(),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    ElevatedButton(onPressed: _add, child: const Text('افزودن')),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                ..._items.map((e) => Card(
+                      child: ListTile(
+                        title: Text(e),
+                        trailing: IconButton(
+                          icon: Icon(Icons.delete_outline, color: AppColors.danger),
+                          onPressed: () => _remove(e),
+                        ),
+                      ),
+                    )),
+              ],
+            ),
     );
   }
 }
