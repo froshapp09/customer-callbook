@@ -165,7 +165,7 @@ class _HistoryPageState extends State<HistoryPage> {
               Container(
                 padding: const EdgeInsets.all(4),
                 decoration: BoxDecoration(
-                  color: AppColors.surfaceElevated.withOpacity(0.9),
+                  color: AppColors.surfaceElevated,
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(color: AppColors.border),
                 ),
@@ -305,7 +305,7 @@ class _MiniStat extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 10),
         decoration: BoxDecoration(
-          color: AppColors.surfaceElevated.withOpacity(0.9),
+          color: AppColors.surfaceElevated,
           borderRadius: BorderRadius.circular(14),
           border: Border.all(color: AppColors.border),
         ),
@@ -402,7 +402,7 @@ class _HistoryTile extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: Material(
-        color: AppColors.surfaceElevated.withOpacity(0.92),
+        color: AppColors.surfaceElevated,
         borderRadius: BorderRadius.circular(16),
         child: InkWell(
           onTap: onCall,

@@ -1,4 +1,4 @@
-package ir.apadanasleep.customer_callbook
+package ir.apadanasleep.daftarche
 
 import android.database.Cursor
 import android.provider.CallLog
@@ -7,7 +7,7 @@ import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterActivity() {
-    private val channelName = "ir.apadanasleep.customer_callbook/call_log"
+    private val channelName = "ir.apadanasleep.daftarche/call_log"
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)

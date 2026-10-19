@@ -13,6 +13,7 @@ import 'package:customer_callbook/features/customer_detail/presentation/pages/cu
 import 'package:customer_callbook/features/call_sync/presentation/pages/call_sync_page.dart';
 import 'package:customer_callbook/features/add_customer/presentation/pages/add_customer_page.dart';
 import 'package:customer_callbook/features/history/presentation/pages/history_page.dart';
+import 'package:customer_callbook/services/call_listener_service.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -35,6 +36,9 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _load() async {
     setState(() => _loading = true);
+    try {
+      await _autoImportRecent();
+    } catch (_) {}
     final list = await _service.getAll();
     if (mounted) {
       setState(() {
@@ -43,6 +47,37 @@ class _HomePageState extends State<HomePage> {
         _refreshToken++;
       });
     }
+  }
+
+  /// شناسایی تماس‌های اخیر برای مشتریان ثبت‌شده (بدون درخواست مجوز اضافه)
+  Future<void> _autoImportRecent() async {
+    try {
+      final entries = await _service.fetchRecentDeviceCalls(days: 2, limit: 25);
+      final seen = <String>{};
+      for (final e in entries) {
+        final phone = (e['number'] ?? '').toString().trim();
+        if (phone.isEmpty) continue;
+        final key = Customer.normalizePhone(phone);
+        if (seen.contains(key)) continue;
+        seen.add(key);
+        final existing = await _service.findByPhone(phone);
+        if (existing == null) continue;
+        final typ = (e['type'] ?? '').toString().toLowerCase();
+        final typeInt = typ.contains('miss') || typ.contains('reject')
+            ? 3
+            : (typ.contains('in') ? 1 : 2);
+        final ts = e['timestamp'];
+        final at = ts is int ? DateTime.fromMillisecondsSinceEpoch(ts) : null;
+        // اگر آخرین تماس اپ جدیدتر/برابر است، رد شو
+        if (existing.lastCallAt != null && at != null && !at.isAfter(existing.lastCallAt!)) {
+          continue;
+        }
+        await _service.recordCall(phone, name: existing.name, type: typeInt);
+        if (at != null) {
+          await _service.addCallRecord(phone: phone, customerId: existing.id, type: typeInt, at: at);
+        }
+      }
+    } catch (_) {}
   }
 
   Future<void> _dial(String phone) async {
@@ -401,7 +436,7 @@ class _GlassCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: AppColors.surfaceElevated.withOpacity(AppColors.isDark ? 0.85 : 0.92),
+        color: AppColors.surfaceElevated,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: AppColors.border),
         boxShadow: [BoxShadow(color: AppColors.shadow, blurRadius: 18, offset: const Offset(0, 8))],
@@ -465,6 +500,8 @@ class _SettingsTab extends StatelessWidget {
         ),
         const SizedBox(height: 20),
         _ThemeTile(),
+        const SizedBox(height: 10),
+        const _CallDetectTile(),
         const SizedBox(height: 10),
         _tile(context, Icons.phone_android_rounded, AppColors.primary, 'تماس‌های گوشی', 'خواندن تاریخچه و افزودن', () async {
           await Navigator.push(context, MaterialPageRoute(builder: (_) => const CallSyncPage()));
@@ -596,7 +633,7 @@ class _TagColorPageState extends State<_TagColorPage> {
                     spacing: 10,
                     runSpacing: 10,
                     children: tags.palette.map((c) {
-                      final selected = c.value == color.value;
+                      final selected = TagColors.instance.isSelected(tag, c);
                       return GestureDetector(
                         onTap: () async {
                           await tags.set(tag, c);
@@ -621,6 +658,82 @@ class _TagColorPageState extends State<_TagColorPage> {
             ),
           );
         }).toList(),
+      ),
+    );
+  }
+}
+
+class _CallDetectTile extends StatefulWidget {
+  const _CallDetectTile();
+  @override
+  State<_CallDetectTile> createState() => _CallDetectTileState();
+}
+
+class _CallDetectTileState extends State<_CallDetectTile> {
+  bool _on = false;
+  bool _busy = false;
+
+  @override
+  void initState() {
+    super.initState();
+    CallListenerService.instance.isEnabled().then((v) {
+      if (mounted) setState(() => _on = v);
+    });
+  }
+
+  Future<void> _toggle(bool v) async {
+    setState(() => _busy = true);
+    try {
+      if (v) {
+        final ok = await CallListenerService.instance.enableAndStart();
+        if (!ok && mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('مجوز تلفن لازم است. از تنظیمات مجوز بدهید.')),
+          );
+          await openAppSettings();
+        }
+        setState(() => _on = ok);
+      } else {
+        await CallListenerService.instance.disableAndStop();
+        setState(() => _on = false);
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return _GlassCard(
+      child: Row(
+        children: [
+          if (_busy)
+            const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2))
+          else
+            Switch(value: _on, onChanged: _toggle),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text('شناسایی تماس ورودی', style: Theme.of(context).textTheme.titleMedium),
+                Text(
+                  _on ? 'فعال — با تماس، اعلان نام مشتری می‌آید' : 'خاموش — برای اعلان هنگام تماس روشن کنید',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(14),
+              gradient: LinearGradient(colors: [AppColors.accent, AppColors.accent.withOpacity(0.75)]),
+              boxShadow: [BoxShadow(color: AppColors.accent.withOpacity(0.35), blurRadius: 10, offset: const Offset(0, 4))],
+            ),
+            child: const Icon(Icons.ring_volume_rounded, color: Colors.white, size: 22),
+          ),
+        ],
       ),
     );
   }

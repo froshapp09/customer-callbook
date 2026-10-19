@@ -1,101 +1,127 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:phone_state/phone_state.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:customer_callbook/data/services/customer_service.dart';
 import 'package:customer_callbook/data/models/customer.dart';
-import 'package:customer_callbook/features/add_customer/presentation/pages/add_customer_page.dart';
 
+/// شنود تماس ورودی + اعلان نام مشتری
 class CallListenerService {
-  static final CallListenerService _instance = CallListenerService._();
-  factory CallListenerService() => _instance;
+  static final CallListenerService instance = CallListenerService._();
+  factory CallListenerService() => instance;
   CallListenerService._();
 
+  static const _prefKey = 'call_detect_enabled';
   final _customerService = CustomerService();
   final _notifications = FlutterLocalNotificationsPlugin();
   StreamSubscription<PhoneState>? _sub;
   bool _isListening = false;
   bool _notifReady = false;
-  BuildContext? _context;
+  bool get isListening => _isListening;
+
+  Future<bool> isEnabled() async {
+    final p = await SharedPreferences.getInstance();
+    return p.getBool(_prefKey) ?? false;
+  }
+
+  Future<void> setEnabled(bool v) async {
+    final p = await SharedPreferences.getInstance();
+    await p.setBool(_prefKey, v);
+  }
 
   Future<void> initNotifications() async {
     if (_notifReady) return;
     const android = AndroidInitializationSettings('@mipmap/ic_launcher');
-    const initSettings = InitializationSettings(android: android);
-    await _notifications.initialize(initSettings);
-
-    // کانال نوتیفیکیشن
-    final androidPlugin = _notifications.resolvePlatformSpecificImplementation<
-        AndroidFlutterLocalNotificationsPlugin>();
+    await _notifications.initialize(const InitializationSettings(android: android));
+    final androidPlugin = _notifications.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
     await androidPlugin?.createNotificationChannel(
       const AndroidNotificationChannel(
         'incoming_calls',
         'تماس‌های ورودی',
-        description: 'نمایش اطلاعات تماس‌گیرنده',
+        description: 'نمایش نام مشتری هنگام تماس',
         importance: Importance.max,
+        playSound: true,
+      ),
+    );
+    await androidPlugin?.createNotificationChannel(
+      const AndroidNotificationChannel(
+        'call_monitor',
+        'شناسایی تماس',
+        description: 'سرویس شناسایی تماس فعال است',
+        importance: Importance.low,
       ),
     );
     _notifReady = true;
   }
 
-  /// درخواست همه مجوزهای لازم + باز وضعیت
-  Future<Map<String, bool>> requestAllPermissions() async {
-    final results = <String, bool>{};
-
-    // مجوز تلفن (اصلی برای تشخیص تماس)
-    var phone = await Permission.phone.status;
-    if (!phone.isGranted) {
-      phone = await Permission.phone.request();
-    }
-    results['phone'] = phone.isGranted;
-
-    // نوتیفیکیشن (اندروید ۱۳+)
-    var notif = await Permission.notification.status;
-    if (!notif.isGranted) {
-      notif = await Permission.notification.request();
-    }
-    results['notification'] = notif.isGranted;
-
-    return results;
-  }
-
   Future<bool> requestPermissions() async {
-    final r = await requestAllPermissions();
-    return r['phone'] == true;
+    final phone = await Permission.phone.request();
+    await Permission.notification.request();
+    // call log helps match numbers
+    await Permission.phone.request();
+    try {
+      // ignore: deprecated_member_use
+      await Permission.phone.request();
+    } catch (_) {}
+    return phone.isGranted;
   }
 
-  Future<bool> get isPhonePermissionGranted async {
-    return await Permission.phone.isGranted;
-  }
-
-  Future<void> startListening(BuildContext context) async {
-    _context = context;
-    if (_isListening) return;
-
+  /// از تنظیمات یا استارت اپ
+  Future<bool> enableAndStart() async {
     await initNotifications();
-    final granted = await Permission.phone.isGranted;
-    if (!granted) {
-      debugPrint('مجوز تماس هنوز داده نشده');
+    final ok = await requestPermissions();
+    if (!ok) return false;
+    await setEnabled(true);
+    await startListening();
+    await _showMonitorNotification();
+    return _isListening;
+  }
+
+  Future<void> disableAndStop() async {
+    await setEnabled(false);
+    stopListening();
+    await _notifications.cancel(9001);
+  }
+
+  /// اگر قبلاً فعال شده، دوباره شروع کن (مثلاً بعد از باز شدن اپ)
+  Future<void> restoreIfEnabled() async {
+    if (await isEnabled()) {
+      await initNotifications();
+      if (await Permission.phone.isGranted) {
+        await startListening();
+        await _showMonitorNotification();
+      }
+    }
+  }
+
+  Future<void> startListening() async {
+    if (_isListening) return;
+    await initNotifications();
+    if (!await Permission.phone.isGranted) {
+      debugPrint('CallListener: no phone permission');
       return;
     }
-
     _isListening = true;
+    _sub?.cancel();
     _sub = PhoneState.stream.listen((event) async {
-      if (event.status == PhoneStateStatus.CALL_INCOMING) {
-        final number = event.number ?? '';
+      try {
+        if (event.status != PhoneStateStatus.CALL_INCOMING) return;
+        final number = (event.number ?? '').trim();
         if (number.isEmpty) return;
 
         final customer = await _customerService.findByPhone(number);
-        await _customerService.recordCall(number, name: customer?.name);
-
+        await _customerService.recordCall(number, name: customer?.name, type: 1);
         await _showCallNotification(number, customer);
-
-        if (_context != null && _context!.mounted) {
-          _showIncomingPopup(_context!, number, customer);
-        }
+      } catch (e) {
+        debugPrint('CallListener error: $e');
       }
+    }, onError: (e) {
+      debugPrint('CallListener stream error: $e');
     });
+    debugPrint('CallListener: started');
   }
 
   void stopListening() {
@@ -104,11 +130,30 @@ class CallListenerService {
     _isListening = false;
   }
 
+  Future<void> _showMonitorNotification() async {
+    const androidDetails = AndroidNotificationDetails(
+      'call_monitor',
+      'شناسایی تماس',
+      channelDescription: 'سرویس شناسایی تماس فعال است',
+      importance: Importance.low,
+      priority: Priority.low,
+      ongoing: true,
+      autoCancel: false,
+      showWhen: false,
+    );
+    await _notifications.show(
+      9001,
+      'شناسایی تماس فعال است',
+      'با تماس ورودی، نام مشتری نمایش داده می‌شود',
+      const NotificationDetails(android: androidDetails),
+    );
+  }
+
   Future<void> _showCallNotification(String number, Customer? customer) async {
-    final title = customer?.name ?? 'تماس ورودی';
+    final title = customer != null ? 'تماس: ${customer.name}' : 'تماس ورودی';
     final body = customer != null
-        ? '$number  •  ${customer.callCount} تماس قبلی'
-        : '$number  •  مشتری جدید';
+        ? '${Customer.displayPhone(number)} · ${customer.callCount} تماس قبلی · ${customer.tag}'
+        : '${Customer.displayPhone(number)} · در دفترچه نیست';
 
     const androidDetails = AndroidNotificationDetails(
       'incoming_calls',
@@ -116,11 +161,11 @@ class CallListenerService {
       channelDescription: 'نمایش اطلاعات تماس‌گیرنده',
       importance: Importance.max,
       priority: Priority.max,
-      fullScreenIntent: true,
       category: AndroidNotificationCategory.call,
       visibility: NotificationVisibility.public,
       playSound: true,
       enableVibration: true,
+      fullScreenIntent: true,
     );
 
     await _notifications.show(
@@ -128,130 +173,6 @@ class CallListenerService {
       title,
       body,
       const NotificationDetails(android: androidDetails),
-    );
-  }
-
-  void _showIncomingPopup(BuildContext context, String number, Customer? customer) {
-    showGeneralDialog(
-      context: context,
-      barrierDismissible: true,
-      barrierLabel: 'بستن',
-      barrierColor: Colors.black54,
-      transitionDuration: const Duration(milliseconds: 250),
-      pageBuilder: (ctx, anim1, anim2) {
-        return Directionality(
-          textDirection: TextDirection.rtl,
-          child: Center(
-            child: Material(
-              color: Colors.transparent,
-              child: Container(
-                margin: const EdgeInsets.symmetric(horizontal: 28),
-                padding: const EdgeInsets.all(28),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF0F172A),
-                  borderRadius: BorderRadius.circular(24),
-                  border: Border.all(color: const Color(0xFF1E293B)),
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      width: 72,
-                      height: 72,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: (customer != null ? const Color(0xFF14B8A6) : const Color(0xFFF59E0B))
-                            .withOpacity(0.15),
-                      ),
-                      child: Icon(
-                        customer != null ? Icons.person_rounded : Icons.person_add_rounded,
-                        size: 36,
-                        color: customer != null ? const Color(0xFF14B8A6) : const Color(0xFFF59E0B),
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    Text(
-                      customer?.name ?? 'مشتری جدید',
-                      style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w700, color: Colors.white),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 8),
-                    Text(number, style: const TextStyle(fontSize: 16, color: Color(0xFF94A3B8))),
-                    if (customer != null) ...[
-                      const SizedBox(height: 16),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF14B8A6).withOpacity(0.12),
-                          borderRadius: BorderRadius.circular(24),
-                        ),
-                        child: Text(
-                          '${customer.callCount} تماس قبلی',
-                          style: const TextStyle(color: Color(0xFF14B8A6), fontSize: 13, fontWeight: FontWeight.w600),
-                        ),
-                      ),
-                    ],
-                    const SizedBox(height: 28),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TextButton(
-                            onPressed: () => Navigator.pop(ctx),
-                            style: TextButton.styleFrom(
-                              foregroundColor: const Color(0xFF94A3B8),
-                              padding: const EdgeInsets.symmetric(vertical: 14),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(14),
-                                side: const BorderSide(color: Color(0xFF1E293B)),
-                              ),
-                            ),
-                            child: const Text('بستن'),
-                          ),
-                        ),
-                        if (customer == null) ...[
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: ElevatedButton(
-                              onPressed: () {
-                                Navigator.pop(ctx);
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => AddCustomerPage(initialPhone: number),
-                                  ),
-                                );
-                              },
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF14B8A6),
-                                foregroundColor: const Color(0xFF0F172A),
-                                elevation: 0,
-                                padding: const EdgeInsets.symmetric(vertical: 14),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                              ),
-                              child: const Text('افزودن', style: TextStyle(fontWeight: FontWeight.w700)),
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        );
-      },
-      transitionBuilder: (ctx, anim, _, child) {
-        return FadeTransition(
-          opacity: anim,
-          child: ScaleTransition(
-            scale: Tween<double>(begin: 0.9, end: 1.0).animate(
-              CurvedAnimation(parent: anim, curve: Curves.easeOutCubic),
-            ),
-            child: child,
-          ),
-        );
-      },
     );
   }
 }

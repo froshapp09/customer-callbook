@@ -6,6 +6,7 @@ import 'package:customer_callbook/core/theme/theme_controller.dart';
 import 'package:customer_callbook/core/theme/tag_colors.dart';
 import 'package:customer_callbook/data/services/contact_cache.dart';
 import 'package:customer_callbook/features/home/presentation/pages/home_page.dart';
+import 'package:customer_callbook/services/call_listener_service.dart';
 
 class CustomerCallbookApp extends StatefulWidget {
   const CustomerCallbookApp({super.key});
@@ -27,7 +28,10 @@ class _CustomerCallbookAppState extends State<CustomerCallbookApp> {
   Future<void> _init() async {
     await _theme.load();
     await TagColors.instance.load();
-    ContactCache.instance.warmUp(); // background, don't wait
+    ContactCache.instance.warmUp();
+    // بازیابی شنود تماس اگر کاربر فعال کرده
+    CallListenerService.instance.restoreIfEnabled();
+    _applySystemUi(_theme.isDark);
     if (mounted) setState(() {});
   }
 
@@ -42,7 +46,8 @@ class _CustomerCallbookAppState extends State<CustomerCallbookApp> {
       SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
         statusBarIconBrightness: dark ? Brightness.light : Brightness.dark,
-        systemNavigationBarColor: dark ? const Color(0xFF1A1B2E) : const Color(0xFFE8ECF8),
+        statusBarBrightness: dark ? Brightness.dark : Brightness.light,
+        systemNavigationBarColor: dark ? const Color(0xFF1E1F33) : const Color(0xFFFFFFFF),
         systemNavigationBarIconBrightness: dark ? Brightness.light : Brightness.dark,
       ),
     );
@@ -57,17 +62,19 @@ class _CustomerCallbookAppState extends State<CustomerCallbookApp> {
   @override
   Widget build(BuildContext context) {
     AppColors.isDark = _theme.isDark;
+    final dark = _theme.isDark;
     return MaterialApp(
       title: 'دفترچه مشتریان',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
-      themeMode: _theme.isDark ? ThemeMode.dark : ThemeMode.light,
-      home: const HomePage(),
+      themeMode: dark ? ThemeMode.dark : ThemeMode.light,
+      // key اجباری: کل درخت UI با تعویض تم از نو ساخته شود
+      home: HomePage(key: ValueKey<bool>(dark)),
       builder: (context, child) {
         return Directionality(
           textDirection: TextDirection.rtl,
-          child: child!,
+          child: child ?? const SizedBox.shrink(),
         );
       },
     );

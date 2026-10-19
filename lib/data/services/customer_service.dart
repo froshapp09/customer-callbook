@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter/services.dart';
 import 'package:customer_callbook/data/services/contact_cache.dart';
 import 'package:customer_callbook/data/models/customer.dart';
 import 'package:customer_callbook/data/models/call_record.dart';
@@ -180,6 +181,26 @@ class CustomerService {
       list.removeLast();
     }
     await prefs.setString(_callsKey, jsonEncode(list));
+  }
+
+
+  static const _callChannel = MethodChannel('ir.apadanasleep.daftarche/call_log');
+
+  Future<List<Map<String, dynamic>>> fetchRecentDeviceCalls({int days = 1, int limit = 30}) async {
+    try {
+      final result = await _callChannel.invokeMethod<List>('getRecentCalls', {'days': days});
+      if (result == null) return [];
+      final list = <Map<String, dynamic>>[];
+      for (final e in result) {
+        if (e is Map) {
+          list.add(Map<String, dynamic>.from(e));
+        }
+        if (list.length >= limit) break;
+      }
+      return list;
+    } catch (_) {
+      return [];
+    }
   }
 
 }
