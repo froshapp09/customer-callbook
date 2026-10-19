@@ -64,7 +64,7 @@ class AppTheme {
           textStyle: GoogleFonts.vazirmatn(fontWeight: FontWeight.w600, fontSize: 15),
         ),
       ),
-      cardTheme: CardThemeData(
+      cardTheme: CardTheme(
         color: AppColors.surfaceSolid,
         elevation: 0,
         shape: RoundedRectangleBorder(
