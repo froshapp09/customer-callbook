@@ -184,7 +184,7 @@ class CustomerService {
   }
 
 
-  static const _callChannel = MethodChannel('ir.apadanasleep.daftarche/call_log');
+  static const _callChannel = MethodChannel('ir.apadanasleep.customer_callbook/call_log');
 
   Future<List<Map<String, dynamic>>> fetchRecentDeviceCalls({int days = 1, int limit = 30}) async {
     try {

@@ -14,7 +14,7 @@ class CallSyncPage extends StatefulWidget {
 }
 
 class _CallSyncPageState extends State<CallSyncPage> {
-  static const _channel = MethodChannel('ir.apadanasleep.daftarche/call_log');
+  static const _channel = MethodChannel('ir.apadanasleep.customer_callbook/call_log');
   final _service = CustomerService();
   List<Map<String, dynamic>> _entries = [];
   bool _loading = true;
