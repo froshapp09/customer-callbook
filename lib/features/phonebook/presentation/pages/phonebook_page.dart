@@ -9,7 +9,8 @@ import 'package:customer_callbook/features/add_customer/presentation/pages/add_c
 
 class PhonebookPage extends StatefulWidget {
   final VoidCallback? onChanged;
-  const PhonebookPage({super.key, this.onChanged});
+  final int refreshToken;
+  const PhonebookPage({super.key, this.onChanged, this.refreshToken = 0});
 
   @override
   State<PhonebookPage> createState() => _PhonebookPageState();
@@ -27,6 +28,14 @@ class _PhonebookPageState extends State<PhonebookPage> {
   void initState() {
     super.initState();
     _load();
+  }
+
+  @override
+  void didUpdateWidget(covariant PhonebookPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.refreshToken != widget.refreshToken) {
+      _load();
+    }
   }
 
   @override

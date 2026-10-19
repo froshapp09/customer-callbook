@@ -22,6 +22,7 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   int _tab = 0;
+  int _refreshToken = 0;
   final _service = CustomerService();
   List<Customer> _customers = [];
   bool _loading = true;
@@ -35,7 +36,13 @@ class _HomePageState extends State<HomePage> {
   Future<void> _load() async {
     setState(() => _loading = true);
     final list = await _service.getAll();
-    if (mounted) setState(() { _customers = list; _loading = false; });
+    if (mounted) {
+      setState(() {
+        _customers = list;
+        _loading = false;
+        _refreshToken++;
+      });
+    }
   }
 
   Future<void> _dial(String phone) async {
@@ -86,8 +93,8 @@ class _HomePageState extends State<HomePage> {
                   _load();
                 },
               ),
-              PhonebookPage(onChanged: _load),
-              const HistoryPage(),
+              PhonebookPage(onChanged: _load, refreshToken: _refreshToken),
+              HistoryPage(refreshToken: _refreshToken),
               _SettingsTab(onReload: _load, customers: _customers),
             ],
           ),
@@ -99,7 +106,13 @@ class _HomePageState extends State<HomePage> {
           ),
           child: BottomNavigationBar(
             currentIndex: _tab,
-            onTap: (i) => setState(() => _tab = i),
+            onTap: (i) {
+              setState(() {
+                _tab = i;
+                if (i == 1 || i == 2) _refreshToken++;
+              });
+              if (i == 1 || i == 2) _load();
+            },
             backgroundColor: Colors.transparent,
             elevation: 0,
             items: const [
@@ -472,7 +485,7 @@ class _SettingsTab extends StatelessWidget {
           }
           await Share.share(buf.toString(), subject: 'لیست مشتریان');
         }),
-        _tile(context, Icons.info_rounded, AppColors.textMuted, 'درباره برنامه', 'نسخه ۱.۱۱.۰ — دفترچه مشتریان', null),
+        _tile(context, Icons.info_rounded, AppColors.textMuted, 'درباره برنامه', 'نسخه ۱.۱۳.۰ — دفترچه مشتریان', null),
       ],
     );
   }
@@ -527,7 +540,7 @@ class _ThemeTile extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     Text(theme.isDark ? 'حالت تیره' : 'حالت روشن', style: Theme.of(context).textTheme.titleMedium),
-                    Text('فعال‌سازی حالت تیره در برنامه', style: Theme.of(context).textTheme.bodySmall),
+                    Text(theme.isDark ? 'تم تیره فعال است' : 'تم روشن فعال است', style: Theme.of(context).textTheme.bodySmall),
                   ],
                 ),
               ),

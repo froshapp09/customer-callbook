@@ -8,7 +8,8 @@ import 'package:customer_callbook/data/services/customer_service.dart';
 import 'package:customer_callbook/features/customer_detail/presentation/pages/customer_detail_page.dart';
 
 class HistoryPage extends StatefulWidget {
-  const HistoryPage({super.key});
+  final int refreshToken;
+  const HistoryPage({super.key, this.refreshToken = 0});
 
   @override
   State<HistoryPage> createState() => _HistoryPageState();
@@ -28,6 +29,14 @@ class _HistoryPageState extends State<HistoryPage> {
   void initState() {
     super.initState();
     _load();
+  }
+
+  @override
+  void didUpdateWidget(covariant HistoryPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.refreshToken != widget.refreshToken) {
+      _load();
+    }
   }
 
   Future<void> _load() async {
