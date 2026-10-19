@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'dart:io';
+import 'package:file_picker/file_picker.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:share_plus/share_plus.dart';
@@ -505,8 +508,6 @@ class _SettingsTab extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 20),
-        _ThemeTile(),
-        const SizedBox(height: 10),
         const _CallDetectTile(),
         const SizedBox(height: 10),
         _tile(context, Icons.phone_android_rounded, AppColors.primary, 'تماس‌های گوشی', 'خواندن تاریخچه و افزودن', () async {
@@ -536,7 +537,7 @@ class _SettingsTab extends StatelessWidget {
           }
           await Share.share(buf.toString(), subject: 'لیست مشتریان');
         }),
-        _tile(context, Icons.info_rounded, AppColors.textMuted, 'درباره برنامه', 'نسخه ۱.۱۷.۲ (۳۲) — دفترچه مشتریان', null),
+        _tile(context, Icons.info_rounded, AppColors.textMuted, 'درباره برنامه', 'نسخه ۱.۱۸.۱ (۳۴) — دفترچه مشتریان', null),
       ],
     );
   }
@@ -575,43 +576,6 @@ class _SettingsTab extends StatelessWidget {
   }
 }
 
-class _ThemeTile extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    final theme = ThemeController.instance;
-    return AnimatedBuilder(
-      animation: theme,
-      builder: (context, _) {
-        return _GlassCard(
-          child: Row(
-            children: [
-              Switch(value: theme.isDark, onChanged: (v) => theme.setDark(v)),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text(theme.isDark ? 'حالت تیره' : 'حالت روشن', style: Theme.of(context).textTheme.titleMedium),
-                    Text(theme.isDark ? 'تم تیره فعال است' : 'تم روشن فعال است', style: Theme.of(context).textTheme.bodySmall),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 12),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(14),
-                  gradient: LinearGradient(colors: [AppColors.primary, AppColors.primaryDark]),
-                  boxShadow: [BoxShadow(color: AppColors.primary.withOpacity(0.35), blurRadius: 10, offset: const Offset(0, 4))],
-                ),
-                child: Icon(theme.isDark ? Icons.dark_mode_rounded : Icons.light_mode_rounded, color: Colors.white, size: 22),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-}
 
 class _TagColorPage extends StatefulWidget {
   const _TagColorPage();
@@ -753,6 +717,7 @@ class _CallDetectTileState extends State<_CallDetectTile> {
   }
 }
 
+
 class _NoteTemplatesPage extends StatefulWidget {
   const _NoteTemplatesPage();
   @override
@@ -776,15 +741,18 @@ class _NoteTemplatesPageState extends State<_NoteTemplatesPage> {
   }
 
   Future<void> _add() async {
-    final t = _ctrl.text.trim();
-    if (t.isEmpty) return;
-    await NoteTemplatesService.instance.add(t);
+    final text = _ctrl.text.trim();
+    if (text.isEmpty) return;
+    await NoteTemplatesService.instance.add(text);
     _ctrl.clear();
     await _load();
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('«$text» اضافه شد')));
+    }
   }
 
-  Future<void> _remove(String t) async {
-    await NoteTemplatesService.instance.remove(t);
+  Future<void> _remove(String text) async {
+    await NoteTemplatesService.instance.remove(text);
     await _load();
   }
 
@@ -798,42 +766,73 @@ class _NoteTemplatesPageState extends State<_NoteTemplatesPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('یادداشت‌های آماده')),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : ListView(
-              padding: const EdgeInsets.all(16),
+      body: Column(
+        children: [
+          // ساخت یادداشت — همیشه بالای صفحه
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+            color: AppColors.surfaceElevated,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Text('پیش‌فرض اولیه را می‌توانید حذف کنید و متن خودتان بسازید. در صفحه مشتری با یک ضربه انتخاب می‌شوند.',
-                    style: Theme.of(context).textTheme.bodySmall),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: _ctrl,
-                        decoration: const InputDecoration(hintText: 'متن جدید...'),
-                        onSubmitted: (_) => _add(),
-                      ),
+                Text('ساخت یادداشت جدید', style: Theme.of(context).textTheme.titleMedium),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: _ctrl,
+                  textInputAction: TextInputAction.done,
+                  onSubmitted: (_) => _add(),
+                  decoration: InputDecoration(
+                    hintText: 'مثلاً: ارسال فاکتور',
+                    filled: true,
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+                    suffixIcon: IconButton(
+                      icon: Icon(Icons.add_circle, color: AppColors.primary, size: 28),
+                      onPressed: _add,
                     ),
-                    const SizedBox(width: 8),
-                    ElevatedButton(onPressed: _add, child: const Text('افزودن')),
-                  ],
+                  ),
                 ),
-                const SizedBox(height: 16),
-                ..._items.map((e) => Card(
-                      child: ListTile(
-                        title: Text(e),
-                        trailing: IconButton(
-                          icon: Icon(Icons.delete_outline, color: AppColors.danger),
-                          onPressed: () => _remove(e),
-                        ),
-                      ),
-                    )),
+                const SizedBox(height: 8),
+                SizedBox(
+                  height: 48,
+                  child: ElevatedButton.icon(
+                    onPressed: _add,
+                    icon: const Icon(Icons.add),
+                    label: const Text('افزودن یادداشت'),
+                  ),
+                ),
               ],
             ),
+          ),
+          Expanded(
+            child: _loading
+                ? const Center(child: CircularProgressIndicator())
+                : _items.isEmpty
+                    ? Center(child: Text('هنوز یادداشتی نیست — بالا بسازید', style: Theme.of(context).textTheme.bodyMedium))
+                    : ListView.builder(
+                        padding: const EdgeInsets.all(16),
+                        itemCount: _items.length,
+                        itemBuilder: (_, i) {
+                          final e = _items[i];
+                          return Card(
+                            margin: const EdgeInsets.only(bottom: 10),
+                            child: ListTile(
+                              title: Text(e),
+                              trailing: IconButton(
+                                icon: Icon(Icons.delete_outline, color: AppColors.danger),
+                                onPressed: () => _remove(e),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+          ),
+        ],
+      ),
     );
   }
 }
+
 
 class _BackupPage extends StatefulWidget {
   final VoidCallback onDone;
@@ -843,67 +842,75 @@ class _BackupPage extends StatefulWidget {
 }
 
 class _BackupPageState extends State<_BackupPage> {
-  final _importCtrl = TextEditingController();
   bool _busy = false;
   String? _msg;
 
-  @override
-  void dispose() {
-    _importCtrl.dispose();
-    super.dispose();
-  }
-
-  Future<void> _export() async {
+  Future<void> _saveFile() async {
     setState(() { _busy = true; _msg = null; });
     try {
       final json = await BackupService.instance.exportJson();
-      await Clipboard.setData(ClipboardData(text: json));
-      if (mounted) {
-        setState(() => _msg = 'پشتیبان کپی شد. در یادداشت‌های گوشی یا فایل ذخیره کنید.');
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('JSON پشتیبان در کلیپ‌بورد کپی شد')),
+      const name = 'daftarche_backup.json';
+      Directory dir;
+      try {
+        dir = Directory('/storage/emulated/0/Download/Daftarche');
+        if (!await dir.exists()) await dir.create(recursive: true);
+      } catch (_) {
+        dir = await getApplicationDocumentsDirectory();
+      }
+      final file = File('${dir.path}/$name');
+      await file.writeAsString(json);
+      final path = file.path;
+      try {
+        await Share.shareXFiles(
+          [XFile(path)],
+          text: 'پشتیبان دفترچه — $path',
+          subject: 'Backup Daftarche',
         );
+      } catch (_) {}
+      if (mounted) {
+        setState(() => _msg =
+            '✓ ذخیره شد\n'
+            '📁 پوشه: Download / Daftarche\n'
+            '📄 نام فایل: daftarche_backup.json\n'
+            'برای بازیابی همان فایل را از این پوشه انتخاب کنید.');
       }
     } catch (e) {
-      setState(() => _msg = 'خطا: $e');
+      if (mounted) setState(() => _msg = 'خطا در ذخیره: $e');
     } finally {
       if (mounted) setState(() => _busy = false);
     }
   }
 
-  Future<void> _exportCsv() async {
+  Future<void> _loadFile() async {
     setState(() { _busy = true; _msg = null; });
     try {
-      final csv = await BackupService.instance.exportCsv();
-      await Clipboard.setData(ClipboardData(text: csv));
-      if (mounted) {
-        setState(() => _msg = 'CSV کپی شد.');
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('CSV در کلیپ‌بورد کپی شد')),
-        );
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.any,
+        withData: true,
+      );
+      if (result == null || result.files.isEmpty) {
+        setState(() { _busy = false; _msg = 'فایلی انتخاب نشد'; });
+        return;
       }
-    } catch (e) {
-      setState(() => _msg = 'خطا: $e');
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
-  }
-
-  Future<void> _import() async {
-    final raw = _importCtrl.text.trim();
-    if (raw.isEmpty) return;
-    setState(() { _busy = true; _msg = null; });
-    try {
+      final f = result.files.first;
+      String raw;
+      if (f.bytes != null) {
+        raw = String.fromCharCodes(f.bytes!);
+      } else if (f.path != null) {
+        raw = await File(f.path!).readAsString();
+      } else {
+        throw Exception('نتوانست فایل را بخواند');
+      }
       final n = await BackupService.instance.importJson(raw);
       widget.onDone();
       if (mounted) {
-        setState(() => _msg = '$n مشتری بازیابی شد.');
+        setState(() => _msg = '✓ $n مشتری از فایل بازیابی شد');
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('$n مشتری بازیابی شد')),
+          SnackBar(content: Text('$n مشتری بازیابی شد'), backgroundColor: AppColors.success),
         );
       }
     } catch (e) {
-      setState(() => _msg = 'خطا در بازیابی: $e');
+      if (mounted) setState(() => _msg = 'خطا در بازیابی: $e');
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -914,48 +921,52 @@ class _BackupPageState extends State<_BackupPage> {
     return Scaffold(
       appBar: AppBar(title: const Text('پشتیبان شماره‌ها')),
       body: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(20),
         children: [
-          Text(
-            'قبل از حذف اپ یا نصب نسخه جدید، پشتیبان بگیرید. بعد از نصب، همینجا بازیابی کنید.',
-            style: Theme.of(context).textTheme.bodyMedium,
-          ),
-          const SizedBox(height: 16),
-          ElevatedButton.icon(
-            onPressed: _busy ? null : _export,
-            icon: const Icon(Icons.copy_all),
-            label: const Text('کپی پشتیبان کامل (JSON)'),
-          ),
-          const SizedBox(height: 8),
-          OutlinedButton.icon(
-            onPressed: _busy ? null : _exportCsv,
-            icon: const Icon(Icons.table_chart_outlined),
-            label: const Text('کپی خروجی CSV'),
-          ),
-          const SizedBox(height: 24),
-          Text('بازیابی از JSON', style: Theme.of(context).textTheme.titleMedium),
-          const SizedBox(height: 8),
-          TextField(
-            controller: _importCtrl,
-            maxLines: 8,
-            decoration: const InputDecoration(
-              hintText: 'متن JSON پشتیبان را اینجا بچسبانید...',
-              border: OutlineInputBorder(),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: AppColors.primary.withOpacity(0.12),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Text(
+              'محل ذخیره ثابت:\n'
+              '📂 فایل‌ها → Download → Daftarche\n'
+              '📄 daftarche_backup.json\n\n'
+              '۱) ذخیره پشتیبان را بزنید\n'
+              '۲) بعد از نصب مجدد، «انتخاب فایل» را بزنید و همین فایل را باز کنید',
+              style: Theme.of(context).textTheme.bodyMedium,
             ),
           ),
-          const SizedBox(height: 12),
-          ElevatedButton.icon(
-            onPressed: _busy ? null : _import,
-            icon: const Icon(Icons.restore),
-            label: const Text('بازیابی مشتریان'),
+          const SizedBox(height: 24),
+          Text('ذخیره', style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 10),
+          SizedBox(
+            height: 52,
+            child: ElevatedButton.icon(
+              onPressed: _busy ? null : _saveFile,
+              icon: const Icon(Icons.save_alt_rounded),
+              label: const Text('ذخیره فایل پشتیبان'),
+            ),
           ),
-          if (_busy) const Padding(
-            padding: EdgeInsets.all(16),
-            child: Center(child: CircularProgressIndicator()),
+          const SizedBox(height: 28),
+          Text('بازیابی', style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 10),
+          SizedBox(
+            height: 52,
+            child: OutlinedButton.icon(
+              onPressed: _busy ? null : _loadFile,
+              icon: const Icon(Icons.folder_open_rounded),
+              label: const Text('انتخاب فایل پشتیبان از گوشی'),
+            ),
           ),
+          if (_busy) ...[
+            const SizedBox(height: 20),
+            const Center(child: CircularProgressIndicator()),
+          ],
           if (_msg != null) ...[
-            const SizedBox(height: 12),
-            Text(_msg!, style: TextStyle(color: AppColors.primary)),
+            const SizedBox(height: 20),
+            Text(_msg!, style: TextStyle(color: AppColors.primary, height: 1.5)),
           ],
         ],
       ),
