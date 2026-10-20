@@ -21,6 +21,7 @@ class CallListenerService {
   StreamSubscription? _sub;
   bool _isListening = false;
   bool _notifReady = false;
+  String? _lastIncoming;
   bool get isListening => _isListening;
 
   Future<bool> isEnabled() async {
@@ -110,13 +111,32 @@ class CallListenerService {
       try {
         if (event is! Map) return;
         final status = event['status']?.toString() ?? '';
-        if (status != 'incoming') return;
         final number = (event['number'] ?? '').toString().trim();
-        if (number.isEmpty) return;
 
-        final customer = await _customerService.findByPhone(number);
-        await _customerService.recordCall(number, name: customer?.name, type: 1);
-        await _showCallNotification(number, customer);
+        if (status == 'incoming') {
+          if (number.isEmpty) return;
+          _lastIncoming = number;
+          final customer = await _customerService.findByPhone(number);
+          if (customer != null) {
+            await _customerService.recordCall(number, name: customer.name, type: 1);
+            await _showCallNotification(number, customer);
+          } else {
+            // شماره در دفترچه نیست — فقط اعلان ساده هنگام زنگ
+            await _showUnknownRinging(number);
+          }
+          return;
+        }
+
+        if (status == 'idle') {
+          final n = number.isNotEmpty ? number : (_lastIncoming ?? '');
+          _lastIncoming = null;
+          if (n.isEmpty) return;
+          final customer = await _customerService.findByPhone(n);
+          if (customer == null) {
+            // بعد از قطع تماس: پیشنهاد ذخیره
+            await _showSavePrompt(n);
+          }
+        }
       } catch (e) {
         debugPrint('CallListener handle: $e');
       }

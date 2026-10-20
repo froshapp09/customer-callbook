@@ -60,6 +60,10 @@ class _PhonebookPageState extends State<PhonebookPage> {
     var list = List<Customer>.from(_all);
     if (_tag == 'ویژه') {
       list = list.where((c) => c.favorite).toList();
+    } else if (_tag == 'یادآوری') {
+      list = list.where((c) => c.reminderAt != null).toList();
+    } else if (CustomerStatus.all.contains(_tag)) {
+      list = list.where((c) => c.status == _tag).toList();
     } else if (_tag != 'همه') {
       list = list.where((c) => c.tag == _tag).toList();
     }
@@ -69,7 +73,9 @@ class _PhonebookPageState extends State<PhonebookPage> {
       list = list.where((c) {
         return c.name.toLowerCase().contains(lower) ||
             c.phone.contains(q) ||
-            Customer.normalizePhone(c.phone).contains(Customer.normalizePhone(q));
+            Customer.normalizePhone(c.phone).contains(Customer.normalizePhone(q)) ||
+            (c.city ?? '').toLowerCase().contains(lower) ||
+            (c.note ?? '').toLowerCase().contains(lower);
       }).toList();
     }
     setState(() => _filtered = list);
@@ -107,7 +113,7 @@ class _PhonebookPageState extends State<PhonebookPage> {
                 controller: _search,
                 onChanged: (_) => _apply(),
                 decoration: const InputDecoration(
-                  hintText: 'جستجوی مخاطب...',
+                  hintText: 'نام، شماره، شهر، یادداشت...',
                   prefixIcon: Icon(Icons.search),
                 ),
               ),
@@ -115,7 +121,7 @@ class _PhonebookPageState extends State<PhonebookPage> {
               SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
                 child: Row(
-                  children: ['همه', 'ویژه', 'مشتری', 'همکار', 'سایر'].map((t) {
+                  children: ['همه', 'ویژه', 'یادآوری', 'جدید', 'در حال مذاکره', 'خرید کرده', 'بی‌پاسخ', 'مشتری', 'همکار', 'سایر'].map((t) {
                     final sel = _tag == t;
                     return Padding(
                       padding: const EdgeInsets.only(left: 8),

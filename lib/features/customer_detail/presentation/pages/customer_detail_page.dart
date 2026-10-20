@@ -23,6 +23,8 @@ class _CustomerDetailPageState extends State<CustomerDetailPage> {
   late Customer _customer;
   final _service = CustomerService();
   final _noteCtrl = TextEditingController();
+  final _cityCtrl = TextEditingController();
+  final _amountCtrl = TextEditingController();
   List<CallRecord> _history = [];
   List<String> _templates = [];
 
@@ -31,6 +33,8 @@ class _CustomerDetailPageState extends State<CustomerDetailPage> {
     super.initState();
     _customer = widget.customer;
     _noteCtrl.text = _customer.note ?? '';
+    _cityCtrl.text = _customer.city ?? '';
+    _amountCtrl.text = _customer.orderAmount != null ? _customer.orderAmount!.toStringAsFixed(0) : '';
     _loadHistory();
   }
 
@@ -46,6 +50,8 @@ class _CustomerDetailPageState extends State<CustomerDetailPage> {
   @override
   void dispose() {
     _noteCtrl.dispose();
+    _cityCtrl.dispose();
+    _amountCtrl.dispose();
     super.dispose();
   }
 
@@ -297,6 +303,129 @@ class _CustomerDetailPageState extends State<CustomerDetailPage> {
               width: double.infinity,
               child: ElevatedButton(onPressed: _saveNote, child: const Text('ذخیره یادداشت')),
             ),
+            const SizedBox(height: 24),
+            Align(
+              alignment: Alignment.centerRight,
+              child: Text('وضعیت فروش', style: Theme.of(context).textTheme.titleMedium),
+            ),
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: CustomerStatus.all.map((s) {
+                final selected = _customer.status == s;
+                final c = Color(CustomerStatus.colorValue(s));
+                return ChoiceChip(
+                  label: Text(s),
+                  selected: selected,
+                  selectedColor: c.withOpacity(0.2),
+                  labelStyle: TextStyle(
+                    color: selected ? c : AppColors.textSecondary,
+                    fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                  ),
+                  onSelected: (_) async {
+                    final u = _customer.copyWith(status: s);
+                    await _service.update(u);
+                    setState(() => _customer = u);
+                  },
+                );
+              }).toList(),
+            ),
+            const SizedBox(height: 20),
+            Align(
+              alignment: Alignment.centerRight,
+              child: Text('شهر / منطقه', style: Theme.of(context).textTheme.titleMedium),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _cityCtrl,
+              decoration: const InputDecoration(hintText: 'مثلاً تهران، کرج...'),
+              onChanged: (v) async {
+                final u = _customer.copyWith(city: v.trim().isEmpty ? null : v.trim());
+                // don't save every keystroke - save on button
+                setState(() => _customer = u);
+              },
+            ),
+            const SizedBox(height: 16),
+            Align(
+              alignment: Alignment.centerRight,
+              child: Text('مبلغ سفارش (تومان)', style: Theme.of(context).textTheme.titleMedium),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _amountCtrl,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(hintText: 'مثلاً 8500000'),
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton(
+                onPressed: () async {
+                  final amt = double.tryParse(_amountCtrl.text.replaceAll(',', '').trim());
+                  final u = _customer.copyWith(
+                    city: _cityCtrl.text.trim().isEmpty ? null : _cityCtrl.text.trim(),
+                    orderAmount: amt,
+                    note: _noteCtrl.text.trim().isEmpty ? null : _noteCtrl.text.trim(),
+                  );
+                  await _service.update(u);
+                  setState(() => _customer = u);
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('اطلاعات ذخیره شد'), backgroundColor: AppColors.success),
+                    );
+                  }
+                },
+                child: const Text('ذخیره شهر و مبلغ'),
+              ),
+            ),
+            const SizedBox(height: 24),
+            Align(
+              alignment: Alignment.centerRight,
+              child: Text('یادآوری تماس مجدد', style: Theme.of(context).textTheme.titleMedium),
+            ),
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                ('فردا', 1),
+                ('۳ روز بعد', 3),
+                ('یک هفته', 7),
+              ].map((e) {
+                return ActionChip(
+                  avatar: const Icon(Icons.alarm, size: 16),
+                  label: Text(e.$1),
+                  onPressed: () async {
+                    final when = DateTime.now().add(Duration(days: e.$2));
+                    final u = _customer.copyWith(reminderAt: when);
+                    await _service.update(u);
+                    setState(() => _customer = u);
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('یادآوری برای ${e.$1} تنظیم شد')),
+                      );
+                    }
+                  },
+                );
+              }).toList(),
+            ),
+            if (_customer.reminderAt != null) ...[
+              const SizedBox(height: 8),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: Icon(Icons.notifications_active, color: AppColors.warning),
+                title: Text('یادآوری: ${Jalali.format(_customer.reminderAt!, withTime: true)}'),
+                trailing: IconButton(
+                  icon: Icon(Icons.close, color: AppColors.danger),
+                  onPressed: () async {
+                    final u = _customer.copyWith(clearReminder: true);
+                    await _service.update(u);
+                    setState(() => _customer = u);
+                  },
+                ),
+              ),
+            ],
             const SizedBox(height: 28),
             Align(
               alignment: Alignment.centerRight,

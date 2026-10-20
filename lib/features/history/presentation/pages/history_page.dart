@@ -41,6 +41,7 @@ class _HistoryPageState extends State<HistoryPage> {
 
   Future<void> _load() async {
     setState(() => _loading = true);
+    await _service.dedupeCallHistory();
     final records = await _service.getCallHistory(limit: 300);
     final customers = await _service.getAll();
     final map = <String, Customer>{};

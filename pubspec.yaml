@@ -1,7 +1,7 @@
 name: customer_callbook
 description: دفترچه مشتریان هوشمند
 publish_to: 'none'
-version: 1.18.2+35
+version: 1.21.0+38
 
 environment:
   sdk: '>=3.2.0 <4.0.0'
@@ -20,6 +20,7 @@ dependencies:
   shared_preferences: ^2.3.2
   url_launcher: ^6.3.0
   flutter_local_notifications: ^17.2.3
+  home_widget: ^0.6.0
   share_plus: ^10.0.2
   flutter_contacts: ^1.1.9+2
 

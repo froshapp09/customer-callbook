@@ -16,6 +16,8 @@ class CustomerService {
     final list = jsonDecode(raw) as List;
     return list.map((e) => Customer.fromJson(Map<String, dynamic>.from(e))).toList()
       ..sort((a, b) {
+        // VIP اول
+        if (a.favorite != b.favorite) return a.favorite ? -1 : 1;
         final aT = a.lastCallAt ?? a.createdAt;
         final bT = b.lastCallAt ?? b.createdAt;
         return bT.compareTo(aT);
@@ -167,12 +169,23 @@ class CustomerService {
     final list = raw == null || raw.isEmpty
         ? <Map<String, dynamic>>[]
         : List<Map<String, dynamic>>.from(jsonDecode(raw) as List);
+    final when = at ?? DateTime.now();
+    final norm = Customer.normalizePhone(phone);
+    // جلوگیری از ثبت تکراری همان تماس (ظرف ۲ دقیقه)
+    for (final e in list.take(15)) {
+      final prev = CallRecord.fromJson(Map<String, dynamic>.from(e));
+      if (Customer.normalizePhone(prev.phone) == norm &&
+          prev.type == type &&
+          (when.difference(prev.at).inSeconds).abs() < 120) {
+        return; // skip near-duplicate
+      }
+    }
     final rec = CallRecord(
       id: const Uuid().v4(),
-      phone: Customer.normalizePhone(phone),
+      phone: norm,
       customerId: customerId,
       type: type,
-      at: at ?? DateTime.now(),
+      at: when,
       durationSec: durationSec,
     );
     list.insert(0, rec.toJson());
@@ -201,6 +214,31 @@ class CustomerService {
     } catch (_) {
       return [];
     }
+  }
+
+
+  /// پاکسازی رکوردهای تکراری نزدیک به هم
+  Future<int> dedupeCallHistory() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_callsKey);
+    if (raw == null || raw.isEmpty) return 0;
+    final list = (jsonDecode(raw) as List)
+        .map((e) => CallRecord.fromJson(Map<String, dynamic>.from(e)))
+        .toList();
+    list.sort((a, b) => b.at.compareTo(a.at));
+    final kept = <CallRecord>[];
+    for (final r in list) {
+      final dup = kept.any((k) =>
+          Customer.normalizePhone(k.phone) == Customer.normalizePhone(r.phone) &&
+          k.type == r.type &&
+          (k.at.difference(r.at).inSeconds).abs() < 120);
+      if (!dup) kept.add(r);
+    }
+    final removed = list.length - kept.length;
+    if (removed > 0) {
+      await prefs.setString(_callsKey, jsonEncode(kept.map((e) => e.toJson()).toList()));
+    }
+    return removed;
   }
 
 }

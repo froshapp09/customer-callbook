@@ -20,6 +20,9 @@ import 'package:customer_callbook/features/history/presentation/pages/history_pa
 import 'package:customer_callbook/services/call_listener_service.dart';
 import 'package:customer_callbook/data/services/note_templates_service.dart';
 import 'package:customer_callbook/data/services/backup_service.dart';
+import 'package:customer_callbook/features/report/presentation/pages/weekly_report_page.dart';
+import 'package:customer_callbook/services/widget_service.dart';
+import 'package:customer_callbook/services/widget_service.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -46,6 +49,7 @@ class _HomePageState extends State<HomePage> {
       await _autoImportRecent();
     } catch (_) {}
     final list = await _service.getAll();
+    WidgetService.instance.update();
     if (mounted) {
       setState(() {
         _customers = list;
@@ -522,6 +526,10 @@ class _SettingsTab extends StatelessWidget {
         _tile(context, Icons.sticky_note_2_rounded, const Color(0xFF38BDF8), 'یادداشت‌های آماده', 'انتخاب سریع هنگام ذخیره مشتری', () {
           Navigator.push(context, MaterialPageRoute(builder: (_) => const _NoteTemplatesPage()));
         }),
+        _tile(context, Icons.insights_rounded, const Color(0xFF8B5CF6), 'گزارش هفتگی', 'تماس، مشتری جدید، وضعیت فروش', () {
+          Navigator.push(context, MaterialPageRoute(builder: (_) => const WeeklyReportPage()));
+        }),
+        const SizedBox(height: 10),
         _tile(context, Icons.backup_rounded, const Color(0xFF34D399), 'پشتیبان شماره‌ها', 'ذخیره و بازیابی بعد از نصب مجدد', () {
           Navigator.push(context, MaterialPageRoute(builder: (_) => _BackupPage(onDone: onReload)));
         }),
@@ -537,7 +545,9 @@ class _SettingsTab extends StatelessWidget {
           }
           await Share.share(buf.toString(), subject: 'لیست مشتریان');
         }),
-        _tile(context, Icons.info_rounded, AppColors.textMuted, 'درباره برنامه', 'نسخه ۱.۱۸.۱ (۳۴) — دفترچه مشتریان', null),
+        _tile(context, Icons.info_rounded, AppColors.textMuted, 'درباره برنامه', 'نسخه ۱.۲۱.۰ (۳۸) — info@apadanasleep.ir', () {
+          Navigator.push(context, MaterialPageRoute(builder: (_) => const _AboutPage()));
+        }),
       ],
     );
   }
@@ -849,33 +859,23 @@ class _BackupPageState extends State<_BackupPage> {
     setState(() { _busy = true; _msg = null; });
     try {
       final json = await BackupService.instance.exportJson();
-      const name = 'daftarche_backup.json';
-      Directory dir;
-      try {
-        dir = Directory('/storage/emulated/0/Download/Daftarche');
-        if (!await dir.exists()) await dir.create(recursive: true);
-      } catch (_) {
-        dir = await getApplicationDocumentsDirectory();
-      }
-      final file = File('${dir.path}/$name');
-      await file.writeAsString(json);
-      final path = file.path;
-      try {
-        await Share.shareXFiles(
-          [XFile(path)],
-          text: 'پشتیبان دفترچه — $path',
-          subject: 'Backup Daftarche',
-        );
-      } catch (_) {}
+      const channel = MethodChannel('ir.apadanasleep.customer_callbook/call_log');
+      final path = await channel.invokeMethod<String>('saveToDownloads', {
+        'content': json,
+        'fileName': 'daftarche_backup.json',
+      });
       if (mounted) {
         setState(() => _msg =
-            '✓ ذخیره شد\n'
-            '📁 پوشه: Download / Daftarche\n'
-            '📄 نام فایل: daftarche_backup.json\n'
-            'برای بازیابی همان فایل را از این پوشه انتخاب کنید.');
+            '✓ ذخیره مستقیم انجام شد\n'
+            '📁 فایل‌ها → Download → Daftarche\n'
+            '📄 daftarche_backup.json\n'
+            '${path != null ? 'مسیر: $path' : ''}');
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('پشتیبان در Download/Daftarche ذخیره شد')),
+        );
       }
     } catch (e) {
-      if (mounted) setState(() => _msg = 'خطا در ذخیره: $e');
+      if (mounted) setState(() => _msg = 'خطا در ذخیره مستقیم: $e');
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -930,11 +930,16 @@ class _BackupPageState extends State<_BackupPage> {
               borderRadius: BorderRadius.circular(16),
             ),
             child: Text(
-              'محل ذخیره ثابت:\n'
-              '📂 فایل‌ها → Download → Daftarche\n'
-              '📄 daftarche_backup.json\n\n'
-              '۱) ذخیره پشتیبان را بزنید\n'
-              '۲) بعد از نصب مجدد، «انتخاب فایل» را بزنید و همین فایل را باز کنید',
+              'ذخیره مستقیم (بدون اشتراک‌گذاری):
+'
+              '📂 فایل‌ها → Download → Daftarche
+'
+              '📄 daftarche_backup.json
+
+'
+              '۱) «ذخیره فایل پشتیبان» را بزنید
+'
+              '۲) بعد از نصب مجدد، «انتخاب فایل» و همین مسیر را باز کنید',
               style: Theme.of(context).textTheme.bodyMedium,
             ),
           ),
@@ -968,6 +973,50 @@ class _BackupPageState extends State<_BackupPage> {
             const SizedBox(height: 20),
             Text(_msg!, style: TextStyle(color: AppColors.primary, height: 1.5)),
           ],
+        ],
+      ),
+    );
+  }
+}
+
+class _AboutPage extends StatelessWidget {
+  const _AboutPage();
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('درباره برنامه')),
+      body: ListView(
+        padding: const EdgeInsets.all(24),
+        children: [
+          Center(
+            child: Icon(Icons.contacts_rounded, size: 64, color: AppColors.primary),
+          ),
+          const SizedBox(height: 16),
+          Text('دفترچه مشتریان', textAlign: TextAlign.center, style: Theme.of(context).textTheme.headlineMedium),
+          const SizedBox(height: 8),
+          Text('نسخه ۱.۲۱.۰ (۳۸)', textAlign: TextAlign.center, style: Theme.of(context).textTheme.bodyMedium),
+          const SizedBox(height: 24),
+          ListTile(
+            leading: Icon(Icons.email_outlined, color: AppColors.primary),
+            title: const Text('پشتیبانی و توسعه'),
+            subtitle: const Text('info@apadanasleep.ir'),
+            onTap: () async {
+              final uri = Uri(scheme: 'mailto', path: 'info@apadanasleep.ir', queryParameters: {
+                'subject': 'دفترچه مشتریان',
+              });
+              // ignore: deprecated_member_use
+              try {
+                await launchUrl(uri);
+              } catch (_) {}
+            },
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'آپادانا اسلیپ',
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
         ],
       ),
     );

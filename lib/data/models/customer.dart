@@ -1,11 +1,37 @@
 import 'package:uuid/uuid.dart';
 
+/// وضعیت فروش تلفنی
+class CustomerStatus {
+  static const neu = 'جدید';
+  static const negotiating = 'در حال مذاکره';
+  static const purchased = 'خرید کرده';
+  static const noAnswer = 'بی‌پاسخ';
+  static const all = [neu, negotiating, purchased, noAnswer];
+
+  static int colorValue(String s) {
+    switch (s) {
+      case negotiating:
+        return 0xFFD97706;
+      case purchased:
+        return 0xFF16A34A;
+      case noAnswer:
+        return 0xFFDC2626;
+      default:
+        return 0xFF6C63FF;
+    }
+  }
+}
+
 class Customer {
   final String id;
   final String name;
   final String phone;
   final String? note;
   final String tag; // مشتری، همکار، سایر
+  final String status; // جدید، در حال مذاکره، ...
+  final String? city;
+  final double? orderAmount;
+  final DateTime? reminderAt;
   final bool favorite;
   final int callCount;
   final DateTime? firstCallAt;
@@ -18,6 +44,10 @@ class Customer {
     required this.phone,
     this.note,
     this.tag = 'مشتری',
+    this.status = CustomerStatus.neu,
+    this.city,
+    this.orderAmount,
+    this.reminderAt,
     this.favorite = false,
     this.callCount = 0,
     this.firstCallAt,
@@ -31,6 +61,11 @@ class Customer {
     String? phone,
     String? note,
     String? tag,
+    String? status,
+    String? city,
+    double? orderAmount,
+    DateTime? reminderAt,
+    bool clearReminder = false,
     bool? favorite,
     int? callCount,
     DateTime? firstCallAt,
@@ -42,6 +77,10 @@ class Customer {
       phone: phone ?? this.phone,
       note: note ?? this.note,
       tag: tag ?? this.tag,
+      status: status ?? this.status,
+      city: city ?? this.city,
+      orderAmount: orderAmount ?? this.orderAmount,
+      reminderAt: clearReminder ? null : (reminderAt ?? this.reminderAt),
       favorite: favorite ?? this.favorite,
       callCount: callCount ?? this.callCount,
       firstCallAt: firstCallAt ?? this.firstCallAt,
@@ -56,6 +95,10 @@ class Customer {
         'phone': phone,
         'note': note,
         'tag': tag,
+        'status': status,
+        'city': city,
+        'orderAmount': orderAmount,
+        'reminderAt': reminderAt?.toIso8601String(),
         'favorite': favorite,
         'callCount': callCount,
         'firstCallAt': firstCallAt?.toIso8601String(),
@@ -69,6 +112,10 @@ class Customer {
         phone: (j['phone'] as String?) ?? '',
         note: j['note'] as String?,
         tag: (j['tag'] as String?) ?? 'مشتری',
+        status: (j['status'] as String?) ?? CustomerStatus.neu,
+        city: j['city'] as String?,
+        orderAmount: (j['orderAmount'] as num?)?.toDouble(),
+        reminderAt: j['reminderAt'] != null ? DateTime.tryParse(j['reminderAt']) : null,
         favorite: (j['favorite'] as bool?) ?? false,
         callCount: (j['callCount'] as int?) ?? 0,
         firstCallAt: j['firstCallAt'] != null ? DateTime.tryParse(j['firstCallAt']) : null,
@@ -84,44 +131,24 @@ class Customer {
     return p;
   }
 
-  /// موبایل ایران: 09xxxxxxxxx (۱۱ رقم)
-  static bool isMobile(String phone) {
-    final n = normalizePhone(phone);
-    return RegExp(r'^09\d{9}$').hasMatch(n);
-  }
-
-  /// شماره ثابت ایران (تقریبی)
-  static bool isLandline(String phone) {
-    final n = normalizePhone(phone);
-    if (isMobile(n)) return false;
-    // 0 + کد شهر (۲–۳ رقم) + شماره
-    return RegExp(r'^0[1-8]\d{5,10}$').hasMatch(n);
-  }
-
-  static String phoneTypeLabel(String phone) {
-    if (isMobile(phone)) return 'موبایل';
-    if (isLandline(phone)) return 'ثابت';
-    return 'سایر';
-  }
-
   static String displayPhone(String phone) {
-    final n = normalizePhone(phone);
-    if (n.length == 11 && n.startsWith('09')) {
-      return '${n.substring(0, 4)} ${n.substring(4, 7)} ${n.substring(7)}';
+    final p = normalizePhone(phone);
+    if (p.length == 11 && p.startsWith('09')) {
+      return '${p.substring(0, 4)} ${p.substring(4, 7)} ${p.substring(7)}';
     }
-    if (n.length >= 8 && n.startsWith('0')) {
-      // ثابت: 021 1234 5678
-      if (n.length == 11) {
-        return '${n.substring(0, 3)} ${n.substring(3, 7)} ${n.substring(7)}';
+    if (p.length >= 8) {
+      // landline grouping rough
+      if (p.startsWith('0') && p.length >= 10) {
+        return '${p.substring(0, 3)} ${p.substring(3, 7)} ${p.substring(7)}';
       }
     }
-    return phone;
-  }
-
-  /// برای واتساپ: 98912...
-  static String toWhatsAppNumber(String phone) {
-    var p = normalizePhone(phone);
-    if (p.startsWith('0')) p = '98${p.substring(1)}';
     return p;
   }
+
+  static bool isMobile(String phone) {
+    final p = normalizePhone(phone);
+    return p.startsWith('09') && p.length == 11;
+  }
+
+  static String phoneTypeLabel(String phone) => isMobile(phone) ? 'موبایل' : 'ثابت';
 }
