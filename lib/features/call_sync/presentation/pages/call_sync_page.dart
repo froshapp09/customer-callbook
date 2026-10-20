@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:customer_callbook/core/utils/text_repair.dart';
 import 'package:flutter/services.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:customer_callbook/core/theme/app_colors.dart';
@@ -122,7 +123,7 @@ class _CallSyncPageState extends State<CallSyncPage> {
         );
       }
     } else {
-      String name = (e['name'] ?? '').toString().trim();
+      String name = TextRepair.fix((e['name'] ?? '').toString().trim());
       final fromContacts = await _service.lookupNameFromDeviceContacts(phone);
       if (fromContacts != null && fromContacts.isNotEmpty) {
         name = fromContacts;
@@ -165,7 +166,7 @@ class _CallSyncPageState extends State<CallSyncPage> {
       seen.add(key);
       if (await _service.findByPhone(phone) != null) continue;
 
-      String name = (e['name'] ?? '').toString().trim();
+      String name = TextRepair.fix((e['name'] ?? '').toString().trim());
       if (name.isEmpty || name == phone) {
         name = await _service.lookupNameFromDeviceContacts(phone) ?? phone;
       }

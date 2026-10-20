@@ -6,6 +6,8 @@ import 'package:customer_callbook/core/theme/tag_colors.dart';
 import 'package:customer_callbook/data/services/contact_cache.dart';
 import 'package:customer_callbook/features/home/presentation/pages/home_page.dart';
 import 'package:customer_callbook/services/call_listener_service.dart';
+import 'package:customer_callbook/data/services/customer_service.dart';
+import 'package:customer_callbook/data/services/note_templates_service.dart';
 import 'package:customer_callbook/services/reminder_service.dart';
 import 'package:customer_callbook/services/widget_service.dart';
 
@@ -28,6 +30,10 @@ class _CustomerCallbookAppState extends State<CustomerCallbookApp> {
     await TagColors.instance.load();
     ContactCache.instance.warmUp();
     CallListenerService.instance.restoreIfEnabled();
+    try {
+      await CustomerService().migrateTextEncoding();
+      await NoteTemplatesService.instance.getAll(); // auto-repairs templates
+    } catch (_) {}
     ReminderService.instance.checkDueReminders();
     WidgetService.instance.update();
     SystemChrome.setSystemUIOverlayStyle(

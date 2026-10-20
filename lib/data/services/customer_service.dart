@@ -5,6 +5,7 @@ import 'package:customer_callbook/data/services/contact_cache.dart';
 import 'package:customer_callbook/data/models/customer.dart';
 import 'package:customer_callbook/data/models/call_record.dart';
 import 'package:uuid/uuid.dart';
+import 'package:customer_callbook/core/utils/text_repair.dart';
 
 class CustomerService {
   static const _key = 'customers_v2';
@@ -14,14 +15,29 @@ class CustomerService {
     final raw = prefs.getString(_key);
     if (raw == null || raw.isEmpty) return [];
     final list = jsonDecode(raw) as List;
-    return list.map((e) => Customer.fromJson(Map<String, dynamic>.from(e))).toList()
-      ..sort((a, b) {
-        // VIP اول
+    var customers = list.map((e) => Customer.fromJson(Map<String, dynamic>.from(e))).toList();
+    // تعمیر نام‌های خراب (mojibake)
+    var changed = false;
+    customers = customers.map((c) {
+      final n = TextRepair.fix(c.name);
+      final note = c.note != null ? TextRepair.fix(c.note!) : null;
+      final city = c.city != null ? TextRepair.fix(c.city!) : null;
+      if (n != c.name || note != c.note || city != c.city) {
+        changed = true;
+        return c.copyWith(name: n, note: note, city: city);
+      }
+      return c;
+    }).toList();
+    if (changed) {
+      await _save(customers);
+    }
+    customers.sort((a, b) {
         if (a.favorite != b.favorite) return a.favorite ? -1 : 1;
         final aT = a.lastCallAt ?? a.createdAt;
         final bT = b.lastCallAt ?? b.createdAt;
         return bT.compareTo(aT);
       });
+    return customers;
   }
 
   Future<void> _save(List<Customer> list) async {
@@ -239,6 +255,46 @@ class CustomerService {
       await prefs.setString(_callsKey, jsonEncode(kept.map((e) => e.toJson()).toList()));
     }
     return removed;
+  }
+
+
+
+
+  Future<List<Customer>> getAllRaw() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_key);
+    if (raw == null || raw.isEmpty) return [];
+    final list = jsonDecode(raw) as List;
+    return list
+        .map((e) => Customer.fromJson(Map<String, dynamic>.from(e as Map)))
+        .toList();
+  }
+
+  /// تعمیر نام و یادداشت‌های خراب‌شده (mojibake)
+  Future<void> migrateTextEncoding() async {
+    final all = await getAllRaw();
+    var changed = false;
+    final out = <Customer>[];
+    for (final c in all) {
+      final n = TextRepair.fix(c.name);
+      final note = c.note == null ? null : TextRepair.fix(c.note!);
+      final city = c.city == null ? null : TextRepair.fix(c.city!);
+      final tag = TextRepair.fix(c.tag);
+      final status = TextRepair.fix(c.status);
+      if (n != c.name || note != c.note || city != c.city || tag != c.tag || status != c.status) {
+        changed = true;
+        out.add(c.copyWith(
+          name: n.isEmpty ? c.name : n,
+          note: note,
+          city: city,
+          tag: tag.isEmpty ? c.tag : tag,
+          status: status.isEmpty ? c.status : status,
+        ));
+      } else {
+        out.add(c);
+      }
+    }
+    if (changed) await _save(out);
   }
 
 }

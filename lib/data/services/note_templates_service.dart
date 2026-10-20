@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:customer_callbook/core/utils/text_repair.dart';
 
 class NoteTemplatesService {
   static final NoteTemplatesService instance = NoteTemplatesService._();
@@ -17,11 +18,28 @@ class NoteTemplatesService {
   Future<List<String>> getAll() async {
     final p = await SharedPreferences.getInstance();
     final raw = p.getString(_key);
-    if (raw == null || raw.isEmpty) return List.from(defaults);
+    if (raw == null || raw.isEmpty) {
+      await saveAll(List.from(defaults));
+      return List.from(defaults);
+    }
     try {
-      final list = (jsonDecode(raw) as List).map((e) => e.toString()).where((s) => s.trim().isNotEmpty).toList();
-      return list.isEmpty ? List.from(defaults) : list;
+      final list = (jsonDecode(raw) as List)
+          .map((e) => TextRepair.fix(e.toString()))
+          .where((s) => s.trim().isNotEmpty)
+          .toList();
+      final stillBroken = list.where(TextRepair.looksBroken).length;
+      if (list.isEmpty || stillBroken > 0) {
+        await saveAll(List.from(defaults));
+        return List.from(defaults);
+      }
+      // persist repaired version
+      final original = (jsonDecode(raw) as List).map((e) => e.toString()).toList();
+      if (list.join('|') != original.join('|')) {
+        await saveAll(list);
+      }
+      return list;
     } catch (_) {
+      await saveAll(List.from(defaults));
       return List.from(defaults);
     }
   }
@@ -34,8 +52,8 @@ class NoteTemplatesService {
 
   Future<void> add(String text) async {
     final list = await getAll();
-    final t = text.trim();
-    if (t.isEmpty) return;
+    final t = TextRepair.fix(text.trim());
+    if (t.isEmpty || TextRepair.looksBroken(t)) return;
     if (!list.contains(t)) list.add(t);
     await saveAll(list);
   }

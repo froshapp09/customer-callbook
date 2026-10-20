@@ -1,7 +1,7 @@
 name: customer_callbook
 description: دفترچه مشتریان هوشمند
 publish_to: 'none'
-version: 1.21.5+43
+version: 1.22.0+44
 
 environment:
   sdk: '>=3.2.0 <4.0.0'

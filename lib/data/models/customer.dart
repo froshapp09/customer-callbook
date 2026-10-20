@@ -1,4 +1,5 @@
 import 'package:uuid/uuid.dart';
+import 'package:customer_callbook/core/utils/text_repair.dart';
 
 /// وضعیت فروش تلفنی
 class CustomerStatus {
@@ -108,12 +109,12 @@ class Customer {
 
   factory Customer.fromJson(Map<String, dynamic> j) => Customer(
         id: j['id'] as String?,
-        name: (j['name'] as String?) ?? '',
+        name: TextRepair.fix((j['name'] as String?) ?? ''),
         phone: (j['phone'] as String?) ?? '',
-        note: j['note'] as String?,
-        tag: (j['tag'] as String?) ?? 'مشتری',
-        status: (j['status'] as String?) ?? CustomerStatus.neu,
-        city: j['city'] as String?,
+        note: j['note'] != null ? TextRepair.fix(j['note'] as String) : null,
+        tag: TextRepair.fix((j['tag'] as String?) ?? 'مشتری'),
+        status: TextRepair.fix((j['status'] as String?) ?? CustomerStatus.neu),
+        city: j['city'] != null ? TextRepair.fix(j['city'] as String) : null,
         orderAmount: (j['orderAmount'] as num?)?.toDouble(),
         reminderAt: j['reminderAt'] != null ? DateTime.tryParse(j['reminderAt']) : null,
         favorite: (j['favorite'] as bool?) ?? false,

@@ -1,3 +1,4 @@
+import 'package:customer_callbook/core/utils/text_repair.dart';
 import 'package:flutter_contacts/flutter_contacts.dart';
 import 'package:customer_callbook/data/models/customer.dart';
 
@@ -21,7 +22,7 @@ class ContactCache {
       final contacts = await FlutterContacts.getContacts(withProperties: true);
       final map = <String, String>{};
       for (final c in contacts) {
-        final name = c.displayName.trim();
+        final name = TextRepair.fix(c.displayName.trim());
         if (name.isEmpty) continue;
         for (final p in c.phones) {
           final n = Customer.normalizePhone(p.number);
