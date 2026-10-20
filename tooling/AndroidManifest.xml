@@ -51,7 +51,7 @@
         <receiver
             android:name=".DaftarcheWidgetProvider"
             android:exported="true"
-            android:label="@string/widget_name">
+            android:label="دفترچه مشتریان">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
             </intent-filter>
