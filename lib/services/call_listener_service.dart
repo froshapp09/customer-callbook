@@ -176,6 +176,40 @@ class CallListenerService {
     );
   }
 
+
+  Future<void> _showUnknownRinging(String number) async {
+    const androidDetails = AndroidNotificationDetails(
+      'incoming_calls',
+      'تماس‌های ورودی',
+      channelDescription: 'نمایش اطلاعات تماس‌گیرنده',
+      importance: Importance.high,
+      priority: Priority.high,
+    );
+    await _notifications.show(
+      1002,
+      'تماس ورودی',
+      '${Customer.displayPhone(number)} · در دفترچه نیست',
+      const NotificationDetails(android: androidDetails),
+    );
+  }
+
+  Future<void> _showSavePrompt(String number) async {
+    const androidDetails = AndroidNotificationDetails(
+      'incoming_calls',
+      'تماس‌های ورودی',
+      channelDescription: 'نمایش اطلاعات تماس‌گیرنده',
+      importance: Importance.high,
+      priority: Priority.high,
+      autoCancel: true,
+    );
+    await _notifications.show(
+      1003,
+      'ذخیره این شماره؟',
+      '${Customer.displayPhone(number)} در مخاطبین دفترچه نیست — اپ را باز کنید و اضافه کنید',
+      const NotificationDetails(android: androidDetails),
+    );
+  }
+
   Future<void> _showCallNotification(String number, Customer? customer) async {
     final title = customer != null ? 'تماس: ${customer.name}' : 'تماس ورودی';
     final note = (customer?.note ?? '').trim();

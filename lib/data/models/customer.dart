@@ -151,4 +151,12 @@ class Customer {
   }
 
   static String phoneTypeLabel(String phone) => isMobile(phone) ? 'موبایل' : 'ثابت';
+
+  /// شماره بین‌المللی بدون + برای wa.me
+  static String toWhatsAppNumber(String phone) {
+    var p = normalizePhone(phone);
+    if (p.startsWith('0')) p = '98${p.substring(1)}';
+    if (!p.startsWith('98')) p = '98$p';
+    return p;
+  }
 }

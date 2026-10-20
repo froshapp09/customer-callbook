@@ -930,16 +930,11 @@ class _BackupPageState extends State<_BackupPage> {
               borderRadius: BorderRadius.circular(16),
             ),
             child: Text(
-              'ذخیره مستقیم (بدون اشتراک‌گذاری):
-'
-              '📂 فایل‌ها → Download → Daftarche
-'
-              '📄 daftarche_backup.json
-
-'
-              '۱) «ذخیره فایل پشتیبان» را بزنید
-'
-              '۲) بعد از نصب مجدد، «انتخاب فایل» و همین مسیر را باز کنید',
+              'ذخیره مستقیم (بدون اشتراک‌گذاری):\n'
+              '📂 فایل‌ها → Download → Daftarche\n'
+              '📄 daftarche_backup.json\n\n'
+              '۱) ذخیره فایل پشتیبان را بزنید\n'
+              '۲) بعد از نصب مجدد، انتخاب فایل و همین مسیر را باز کنید',
               style: Theme.of(context).textTheme.bodyMedium,
             ),
           ),
