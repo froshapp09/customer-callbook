@@ -8,6 +8,7 @@ import android.content.IntentFilter
 import android.database.Cursor
 import android.net.Uri
 import android.os.Build
+import android.os.Bundle
 import android.os.Environment
 import android.provider.CallLog
 import android.provider.MediaStore
@@ -27,6 +28,26 @@ class MainActivity : FlutterActivity() {
     private var receiver: BroadcastReceiver? = null
     private var lastState = TelephonyManager.CALL_STATE_IDLE
     private var lastNumber: String? = null
+    private var pendingAddNumber: String? = null
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        captureAddIntent(intent)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        captureAddIntent(intent)
+    }
+
+    private fun captureAddIntent(intent: Intent?) {
+        if (intent == null) return
+        val action = intent.action ?: return
+        if (action == ACTION_ADD_CUSTOMER || action == ACTION_OPEN_CUSTOMER) {
+            pendingAddNumber = intent.getStringExtra(EXTRA_NUMBER)
+        }
+    }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -58,17 +79,21 @@ class MainActivity : FlutterActivity() {
                         }
                     }
                     "stopPhoneListen" -> {
-                        stopReceiver()
-                        result.success(true)
-                    }
-                    "saveToDownloads" -> {
                         try {
+                            stopReceiver()
+                            result.success(true)
+                        } catch (e: Exception) {
+                            result.error("ERROR", e.message, null)
+                        }
+                    }
+                    "saveBackupFile" -> {
+                        try {
+                            val name = call.argument<String>("name") ?: "backup.json"
                             val content = call.argument<String>("content") ?: ""
-                            val fileName = call.argument<String>("fileName") ?: "daftarche_backup.json"
-                            val path = saveToDownloads(content, fileName)
+                            val path = saveBackup(name, content)
                             result.success(path)
                         } catch (e: Exception) {
-                            result.error("SAVE_ERROR", e.message, null)
+                            result.error("ERROR", e.message, null)
                         }
                     }
                     else -> result.notImplemented()
@@ -79,42 +104,12 @@ class MainActivity : FlutterActivity() {
             .setStreamHandler(object : EventChannel.StreamHandler {
                 override fun onListen(arguments: Any?, events: EventChannel.EventSink?) {
                     eventSink = events
-                    try {
-                        startReceiver()
-                    } catch (e: Exception) {
-                        events?.error("ERROR", e.message, null)
-                    }
                 }
 
                 override fun onCancel(arguments: Any?) {
                     eventSink = null
                 }
             })
-    }
-
-    /** ذخیره مستقیم در Download/Daftarche بدون صفحه اشتراک */
-    private fun saveToDownloads(content: String, fileName: String): String {
-        val relativePath = "Download/Daftarche"
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            val values = ContentValues().apply {
-                put(MediaStore.MediaColumns.DISPLAY_NAME, fileName)
-                put(MediaStore.MediaColumns.MIME_TYPE, "application/json")
-                put(MediaStore.MediaColumns.RELATIVE_PATH, relativePath)
-            }
-            // حذف قبلی با همین نام در همان پوشه (اختیاری ساده: همیشه نام جدید با timestamp)
-            val resolver = contentResolver
-            val uri: Uri = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
-                ?: throw Exception("نتوانست فایل بسازد")
-            resolver.openOutputStream(uri)?.use { it.write(content.toByteArray(Charsets.UTF_8)) }
-                ?: throw Exception("نتوانست بنویسد")
-            return "/storage/emulated/0/$relativePath/$fileName"
-        } else {
-            val dir = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "Daftarche")
-            if (!dir.exists()) dir.mkdirs()
-            val file = File(dir, fileName)
-            FileOutputStream(file).use { it.write(content.toByteArray(Charsets.UTF_8)) }
-            return file.absolutePath
-        }
     }
 
     private fun startReceiver() {
@@ -165,20 +160,6 @@ class MainActivity : FlutterActivity() {
         } catch (_: Exception) {
         }
         receiver = null
-    }
-
-    override fun onNewIntent(intent: Intent) {
-        super.onNewIntent(intent)
-        setIntent(intent)
-        captureAddIntent(intent)
-    }
-
-    private fun captureAddIntent(intent: Intent?) {
-        if (intent == null) return
-        val action = intent.action ?: return
-        if (action == CallAlertActivity.ACTION_ADD_CUSTOMER || action == CallAlertActivity.ACTION_OPEN_CUSTOMER) {
-            pendingAddNumber = intent.getStringExtra(CallAlertActivity.EXTRA_NUMBER)
-        }
     }
 
     override fun onDestroy() {
@@ -233,5 +214,32 @@ class MainActivity : FlutterActivity() {
             }
         }
         return out
+    }
+
+    private fun saveBackup(fileName: String, content: String): String {
+        val bytes = content.toByteArray(Charsets.UTF_8)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val values = ContentValues().apply {
+                put(MediaStore.MediaColumns.DISPLAY_NAME, fileName)
+                put(MediaStore.MediaColumns.MIME_TYPE, "application/json")
+                put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS)
+            }
+            val uri = contentResolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
+                ?: throw Exception("cannot create MediaStore entry")
+            contentResolver.openOutputStream(uri)?.use { it.write(bytes) }
+                ?: throw Exception("cannot open output stream")
+            return "Downloads/$fileName"
+        }
+        val dir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+        if (!dir.exists()) dir.mkdirs()
+        val file = File(dir, fileName)
+        FileOutputStream(file).use { it.write(bytes) }
+        return file.absolutePath
+    }
+
+    companion object {
+        const val ACTION_ADD_CUSTOMER = "ir.apadanasleep.customer_callbook.ADD_CUSTOMER"
+        const val ACTION_OPEN_CUSTOMER = "ir.apadanasleep.customer_callbook.OPEN_CUSTOMER"
+        const val EXTRA_NUMBER = "number"
     }
 }
