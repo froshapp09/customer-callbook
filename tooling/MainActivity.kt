@@ -34,6 +34,11 @@ class MainActivity : FlutterActivity() {
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, methodChannelName)
             .setMethodCallHandler { call, result ->
                 when (call.method) {
+                    "getPendingAddPhone" -> {
+                        val n = pendingAddNumber
+                        pendingAddNumber = null
+                        result.success(n)
+                    }
                     "getRecentCalls" -> {
                         try {
                             val days = call.argument<Int>("days") ?: 2
@@ -160,6 +165,20 @@ class MainActivity : FlutterActivity() {
         } catch (_: Exception) {
         }
         receiver = null
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        captureAddIntent(intent)
+    }
+
+    private fun captureAddIntent(intent: Intent?) {
+        if (intent == null) return
+        val action = intent.action ?: return
+        if (action == CallAlertActivity.ACTION_ADD_CUSTOMER || action == CallAlertActivity.ACTION_OPEN_CUSTOMER) {
+            pendingAddNumber = intent.getStringExtra(CallAlertActivity.EXTRA_NUMBER)
+        }
     }
 
     override fun onDestroy() {

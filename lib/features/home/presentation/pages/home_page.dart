@@ -40,6 +40,7 @@ class _HomePageState extends State<HomePage> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _checkPendingAdd());
     _load();
   }
 
@@ -108,6 +109,18 @@ class _HomePageState extends State<HomePage> {
       if (d == null) return false;
       return d.year == now.year && d.month == now.month && d.day == now.day;
     }).length;
+  }
+
+  
+  Future<void> _checkPendingAdd() async {
+    try {
+      const ch = MethodChannel('ir.apadanasleep.customer_callbook/call_log');
+      final n = await ch.invokeMethod<String>('getPendingAddPhone');
+      if (n == null || n.isEmpty || !mounted) return;
+      await Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => AddCustomerPage(initialPhone: n)),
+      );
+    } catch (_) {}
   }
 
   @override

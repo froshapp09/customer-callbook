@@ -29,6 +29,7 @@ class _CustomerCallbookAppState extends State<CustomerCallbookApp> {
     AppColors.isDark = false;
     await TagColors.instance.load();
     ContactCache.instance.warmUp();
+    await CallListenerService.instance.initNotifications();
     CallListenerService.instance.restoreIfEnabled();
     try {
       await CustomerService().migrateTextEncoding();

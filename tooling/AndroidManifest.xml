@@ -43,11 +43,58 @@
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
+            <intent-filter>
+                <action android:name="ir.apadanasleep.customer_callbook.ADD_CUSTOMER"/>
+                <action android:name="ir.apadanasleep.customer_callbook.OPEN_CUSTOMER"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+            </intent-filter>
         </activity>
+
+        <!-- پاپ‌آپ تمام‌صفحه تماس -->
+        <activity
+            android:name=".CallAlertActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:launchMode="singleTop"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
+            android:taskAffinity=""
+            android:theme="@android:style/Theme.Translucent.NoTitleBar.Fullscreen"/>
+
         <meta-data
             android:name="flutterEmbedding"
             android:value="2"/>
-</application>
+
+        <receiver
+            android:name=".PhoneStateReceiver"
+            android:exported="true"
+            android:enabled="true">
+            <intent-filter android:priority="999">
+                <action android:name="android.intent.action.PHONE_STATE"/>
+            </intent-filter>
+        </receiver>
+
+        <receiver
+            android:name=".BootReceiver"
+            android:exported="true"
+            android:enabled="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED"/>
+            </intent-filter>
+        </receiver>
+
+        <receiver
+            android:name=".DaftarcheWidgetProvider"
+            android:exported="true"
+            android:label="دفترچه مشتریان">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE"/>
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/daftarche_widget_info"/>
+        </receiver>
+    </application>
 
     <queries>
         <intent>
