@@ -446,6 +446,11 @@ class CallMonitorService : Service() {
             }
             TelephonyManager.CALL_STATE_OFFHOOK -> {
                 if (!phoneNumber.isNullOrBlank()) lastNumber = phoneNumber
+                // تماس پاسخ داده شد — بنر زنگ را بردار
+                try {
+                    val d = Intent(this, CallOverlayService::class.java).apply { action = CallOverlayService.ACTION_DISMISS }
+                    startService(d)
+                } catch (_: Exception) {}
             }
             TelephonyManager.CALL_STATE_IDLE -> {
                 if (lastState == TelephonyManager.CALL_STATE_IDLE) return
@@ -596,13 +601,121 @@ class CallOverlayService : Service() {
         val name = intent.getStringExtra(EXTRA_NAME)
         val note = intent.getStringExtra(EXTRA_NOTE)
         val mode = intent.getStringExtra(EXTRA_MODE) ?: MODE_SAVE
-        show(number, name, note, mode)
+        // هنگام زنگ: فقط بنر بالای صفحه (دکمه پاسخ تماس آزاد بماند)
+        // بعد از قطع: پاپ‌آپ وسط برای ذخیره
+        if (mode == MODE_RING) {
+            showTopBanner(number, name, note)
+        } else {
+            showCenterDialog(number, name, note, mode)
+        }
         return START_NOT_STICKY
     }
 
-    private fun show(number: String, name: String?, note: String?, mode: String) {
+    private fun showTopBanner(number: String, name: String?, note: String?) {
         if (!Settings.canDrawOverlays(this)) {
-            // بدون مجوز اورلی — Activity تمام‌صفحه
+            stopSelf()
+            return
+        }
+        remove()
+        wm = getSystemService(WINDOW_SERVICE) as WindowManager
+        val density = resources.displayMetrics.density
+        fun dp(v: Int) = (v * density).toInt()
+        val known = !name.isNullOrBlank()
+
+        val card = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER_HORIZONTAL
+            background = GradientDrawable().apply {
+                setColor(Color.parseColor("#E61A1F2E"))
+                cornerRadius = dp(20).toFloat()
+                setStroke(dp(1), Color.parseColor("#33FFFFFF"))
+            }
+            setPadding(dp(16), dp(14), dp(16), dp(14))
+        }
+
+        val title = TextView(this).apply {
+            text = if (known) name else "مشتری ناشناس"
+            setTextColor(Color.parseColor("#FF8C3A"))
+            textSize = 16f
+            typeface = Typeface.DEFAULT_BOLD
+            gravity = Gravity.CENTER
+        }
+        card.addView(title)
+
+        val phoneTv = TextView(this).apply {
+            text = "\u200E" + formatPhone(number)
+            setTextColor(Color.WHITE)
+            textSize = 15f
+            gravity = Gravity.CENTER
+            setPadding(0, dp(4), 0, dp(8))
+        }
+        card.addView(phoneTv)
+
+        if (known && !note.isNullOrBlank()) {
+            val n = TextView(this).apply {
+                text = note
+                setTextColor(Color.parseColor("#99A0B0"))
+                textSize = 12f
+                gravity = Gravity.CENTER
+                setPadding(0, 0, 0, dp(6))
+            }
+            card.addView(n)
+        }
+
+        // فقط بستن — پاسخ تماس را مسدود نکن
+        val close = Button(this).apply {
+            text = "باشه"
+            setTextColor(Color.WHITE)
+            textSize = 13f
+            isAllCaps = false
+            background = GradientDrawable().apply {
+                setColor(Color.parseColor("#2A3142"))
+                cornerRadius = dp(12).toFloat()
+            }
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                dp(40)
+            )
+            setOnClickListener {
+                remove()
+                stopSelf()
+            }
+        }
+        card.addView(close)
+        root = card
+
+        val type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+        else
+            @Suppress("DEPRECATION")
+            WindowManager.LayoutParams.TYPE_PHONE
+
+        // FLAG_NOT_TOUCH_MODAL: لمس بیرون بنر به صفحه تماس می‌رسد (پاسخ/قطع)
+        val params = WindowManager.LayoutParams(
+            WindowManager.LayoutParams.MATCH_PARENT,
+            WindowManager.LayoutParams.WRAP_CONTENT,
+            type,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
+                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
+                WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED,
+            PixelFormat.TRANSLUCENT
+        ).apply {
+            gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
+            y = dp(48)
+            width = WindowManager.LayoutParams.MATCH_PARENT
+        }
+        try {
+            // margin via width
+            params.width = resources.displayMetrics.widthPixels - dp(24)
+            wm?.addView(card, params)
+        } catch (_: Exception) {
+            stopSelf()
+        }
+    }
+
+    private fun showCenterDialog(number: String, name: String?, note: String?, mode: String) {
+        if (!Settings.canDrawOverlays(this)) {
             try {
                 val i = Intent(this, CallAlertActivity::class.java).apply {
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
@@ -621,12 +734,12 @@ class CallOverlayService : Service() {
         wm = getSystemService(WINDOW_SERVICE) as WindowManager
         val density = resources.displayMetrics.density
         fun dp(v: Int) = (v * density).toInt()
-
         val known = !name.isNullOrBlank()
+
         val container = FrameLayout(this).apply {
-            setBackgroundColor(Color.parseColor("#99000A12"))
+            // نیمه‌شفاف ولی لمس بیرون روی دکمه‌های سیستم را نگیرد زیاد — بعد از تماس اوکی است
+            setBackgroundColor(Color.parseColor("#66000A12"))
             isClickable = true
-            setOnClickListener { /* block behind */ }
         }
 
         val card = LinearLayout(this).apply {
@@ -638,7 +751,7 @@ class CallOverlayService : Service() {
                 setStroke(dp(1), Color.parseColor("#33FFFFFF"))
             }
             setPadding(dp(28), dp(28), dp(28), dp(24))
-            val lp = FrameLayout.LayoutParams(
+            layoutParams = FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT,
                 FrameLayout.LayoutParams.WRAP_CONTENT
             ).apply {
@@ -646,7 +759,6 @@ class CallOverlayService : Service() {
                 marginStart = dp(20)
                 marginEnd = dp(20)
             }
-            layoutParams = lp
         }
 
         val icon = TextView(this).apply {
@@ -675,10 +787,6 @@ class CallOverlayService : Service() {
             textSize = 22f
             typeface = Typeface.DEFAULT_BOLD
             gravity = Gravity.CENTER
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply { bottomMargin = dp(8) }
         }
         card.addView(title)
 
@@ -688,10 +796,7 @@ class CallOverlayService : Service() {
             textSize = 20f
             typeface = Typeface.DEFAULT_BOLD
             gravity = Gravity.CENTER
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply { bottomMargin = dp(8) }
+            setPadding(0, dp(8), 0, dp(8))
         }
         card.addView(phoneTv)
 
@@ -699,16 +804,12 @@ class CallOverlayService : Service() {
             text = when {
                 known && !note.isNullOrBlank() -> note
                 known -> "در دفترچه شماست"
-                mode == MODE_SAVE -> "این شماره در دفترچه شما ثبت نشده"
-                else -> "در حال دریافت تماس..."
+                else -> "این شماره در دفترچه شما ثبت نشده"
             }
             setTextColor(Color.parseColor("#99A0B0"))
             textSize = 13f
             gravity = Gravity.CENTER
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply { bottomMargin = dp(20) }
+            setPadding(0, 0, 0, dp(20))
         }
         card.addView(sub)
 
@@ -753,21 +854,11 @@ class CallOverlayService : Service() {
             WindowManager.LayoutParams.MATCH_PARENT,
             WindowManager.LayoutParams.MATCH_PARENT,
             type,
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
+            WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
                 WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
-                WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON or
-                WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON,
+                WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON,
             PixelFormat.TRANSLUCENT
-        ).apply {
-            gravity = Gravity.CENTER
-        }
-        // need focus for buttons
-        params.flags = WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
-            WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
-            WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON or
-            WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
-
+        )
         try {
             wm?.addView(container, params)
         } catch (_: Exception) {
@@ -1094,11 +1185,10 @@ class PhoneStateReceiver : BroadcastReceiver() {
                 savePending(context, number, MODE_RING)
                 val c = findCustomer(context, number)
                 if (c != null) {
+                    // فقط بنر بالا — بدون اعلان نوار (تا دوتایی نشود و پاسخ تماس آزاد بماند)
                     openAlert(context, number, c.first, c.third, MODE_RING)
-                    postNotif(context, "تماس: ${c.first}", ltr(formatPhone(number)), number, c.first, MODE_RING)
                 } else {
                     openAlert(context, number, null, null, MODE_RING)
-                    postNotif(context, "مشتری ناشناس", ltr(formatPhone(number)) + " · در دفترچه نیست", number, null, MODE_RING)
                 }
             }
             TelephonyManager.EXTRA_STATE_OFFHOOK -> {
@@ -1229,7 +1319,8 @@ class PhoneStateReceiver : BroadcastReceiver() {
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setAutoCancel(true)
             .setContentIntent(mainPi)
-            .setFullScreenIntent(fullPi, true)
+            // no fullScreenIntent — blocks answering the call
+            // .setFullScreenIntent(fullPi, true)
 
         if (number != null && name == null) {
             builder.addAction(
