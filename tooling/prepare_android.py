@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Copy native sources + force compileSdk 35. No widget in manifest."""
+"""Copy single MainActivity.kt (contains all native classes) + force compileSdk 35."""
 from pathlib import Path
 import re
 import shutil
@@ -7,7 +7,6 @@ import shutil
 ROOT = Path(__file__).resolve().parents[1]
 TOOLING = Path(__file__).resolve().parent
 APP = ROOT / "android" / "app"
-RES = APP / "src" / "main" / "res"
 KT = APP / "src" / "main" / "kotlin" / "ir" / "apadanasleep" / "customer_callbook"
 MANIFEST = APP / "src" / "main" / "AndroidManifest.xml"
 
@@ -15,7 +14,6 @@ MANIFEST = APP / "src" / "main" / "AndroidManifest.xml"
 def patch_sdk() -> None:
     android = ROOT / "android"
     if not android.exists():
-        print("no android dir")
         return
     for f in android.rglob("build.gradle*"):
         t = f.read_text(encoding="utf-8")
@@ -39,49 +37,47 @@ def patch_sdk() -> None:
 def main() -> None:
     if not APP.exists():
         raise SystemExit("android/app missing")
-
     KT.mkdir(parents=True, exist_ok=True)
-    # MainActivity.kt now contains CallMonitorService class too
+
+    src = TOOLING / "MainActivity.kt"
+    if not src.exists():
+        raise SystemExit("tooling/MainActivity.kt missing")
+    text = src.read_text(encoding="utf-8")
+    for cls in (
+        "MainActivity",
+        "CallMonitorService",
+        "CallOverlayService",
+        "CallAlertActivity",
+        "PhoneStateReceiver",
+        "BootReceiver",
+    ):
+        if f"class {cls}" not in text:
+            raise SystemExit(f"class {cls} missing from MainActivity.kt")
+    shutil.copy2(src, KT / "MainActivity.kt")
+    print("MainActivity.kt copied, bytes", src.stat().st_size)
+
+    # remove any stale separate kt files that could conflict
     for name in (
-        "MainActivity.kt",
+        "CallMonitorService.kt",
+        "CallOverlayService.kt",
+        "CallAlertActivity.kt",
         "PhoneStateReceiver.kt",
         "BootReceiver.kt",
-        "CallAlertActivity.kt",
-        "CallOverlayService.kt",
         "DaftarcheWidgetProvider.kt",
     ):
-        src = TOOLING / name
-        if src.exists():
-            shutil.copy2(src, KT / name)
-            print("kt", name, "bytes", src.stat().st_size)
-
-    # Verify CallMonitorService is available either as file or inside MainActivity
-    main_kt = (KT / "MainActivity.kt").read_text(encoding="utf-8")
-    if "class CallMonitorService" not in main_kt:
-        raise SystemExit("CallMonitorService class missing from MainActivity.kt")
-    print("CallMonitorService OK")
-
-    for sub, name in [
-        ("layout", "daftarche_widget.xml"),
-        ("xml", "daftarche_widget_info.xml"),
-        ("drawable", "widget_bg.xml"),
-    ]:
-        src = TOOLING / "res" / sub / name
-        if src.exists():
-            dst = RES / sub / name
-            dst.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(src, dst)
+        p = KT / name
+        if p.exists():
+            p.unlink()
+            print("removed stale", name)
 
     shutil.copy2(TOOLING / "AndroidManifest.xml", MANIFEST)
-    text = MANIFEST.read_text(encoding="utf-8")
-    if "daftarche_widget_info" in text:
-        raise SystemExit("BUG: manifest still references widget xml")
-    if "PhoneStateReceiver" not in text:
-        raise SystemExit("BUG: PhoneStateReceiver missing from manifest")
-    if "CallMonitorService" not in text:
-        raise SystemExit("BUG: CallMonitorService missing from manifest")
+    man = MANIFEST.read_text(encoding="utf-8")
+    if "daftarche_widget_info" in man:
+        raise SystemExit("widget still in manifest")
+    for name in ("PhoneStateReceiver", "CallMonitorService", "CallOverlayService", "CallAlertActivity"):
+        if name not in man:
+            raise SystemExit(f"{name} missing from manifest")
     print("manifest OK")
-
     patch_sdk()
     print("SUCCESS prepare_android")
 
