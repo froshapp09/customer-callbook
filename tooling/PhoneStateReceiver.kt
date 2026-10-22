@@ -7,7 +7,11 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.os.Build
+import android.provider.CallLog
 import android.telephony.TelephonyManager
+import android.text.SpannableString
+import android.text.Spanned
+import android.text.style.ForegroundColorSpan
 import androidx.core.app.NotificationCompat
 import org.json.JSONArray
 
@@ -17,34 +21,74 @@ class PhoneStateReceiver : BroadcastReceiver() {
         val state = intent.getStringExtra(TelephonyManager.EXTRA_STATE) ?: return
 
         var number = intent.getStringExtra(TelephonyManager.EXTRA_INCOMING_NUMBER)
-        if (number.isNullOrBlank()) {
-            number = lastKnownNumber(context)
+        if (!number.isNullOrBlank()) {
+            lastNumber = number
+            lastWasIncoming = (state == TelephonyManager.EXTRA_STATE_RINGING)
         }
 
         when (state) {
             TelephonyManager.EXTRA_STATE_RINGING -> {
+                if (number.isNullOrBlank()) number = lastNumber
                 if (number.isNullOrBlank()) {
-                    showNotification(context, "تماس ورودی", "شماره در دسترس نیست", null, null, CallAlertActivity.MODE_RINGING)
+                    postNotif(context, "تماس ورودی", "شماره در دسترس نیست", null, null, MODE_RING)
                     return
                 }
+                lastWasIncoming = true
+                lastNumber = number
+                savePending(context, number, MODE_RING)
                 val c = findCustomer(context, number)
                 if (c != null) {
-                    openAlert(context, number, c.first, c.third, CallAlertActivity.MODE_RINGING)
-                    showNotification(context, "تماس: ${c.first}", formatPhone(number), number, c.first, CallAlertActivity.MODE_RINGING)
+                    openAlert(context, number, c.first, c.third, MODE_RING)
+                    postNotif(context, "تماس: ${c.first}", ltr(formatPhone(number)), number, c.first, MODE_RING)
                 } else {
-                    openAlert(context, number, null, null, CallAlertActivity.MODE_RINGING)
-                    showNotification(context, "مشتری ناشناس", formatPhone(number), number, null, CallAlertActivity.MODE_RINGING)
+                    openAlert(context, number, null, null, MODE_RING)
+                    postNotif(context, "مشتری ناشناس", ltr(formatPhone(number)) + " · در دفترچه نیست", number, null, MODE_RING)
                 }
+            }
+            TelephonyManager.EXTRA_STATE_OFFHOOK -> {
+                // پاسخ داده شد یا تماس خروجی — فقط شماره را نگه دار
+                if (!number.isNullOrBlank()) lastNumber = number
             }
             TelephonyManager.EXTRA_STATE_IDLE -> {
-                if (number.isNullOrBlank()) return
-                val c = findCustomer(context, number)
+                val n = when {
+                    !number.isNullOrBlank() -> number
+                    !lastNumber.isNullOrBlank() -> lastNumber
+                    else -> lastKnownNumber(context)
+                } ?: return
+
+                // فقط بعد از تماس ورودی ناشناس پیشنهاد ذخیره بده (نه تماس خروجی)
+                if (!lastWasIncoming) {
+                    lastNumber = null
+                    return
+                }
+                lastWasIncoming = false
+                lastNumber = null
+
+                val c = findCustomer(context, n)
                 if (c == null) {
-                    // بعد از تماس — پیشنهاد ذخیره
-                    openAlert(context, number, null, null, CallAlertActivity.MODE_SAVE)
-                    showNotification(context, "مشتری جدید", formatPhone(number) + " — ذخیره شود؟", number, null, CallAlertActivity.MODE_SAVE)
+                    savePending(context, n, MODE_SAVE)
+                    openAlert(context, n, null, null, MODE_SAVE)
+                    postNotif(
+                        context,
+                        "مشتری جدید",
+                        ltr(formatPhone(n)) + " · ذخیره شود؟",
+                        n,
+                        null,
+                        MODE_SAVE
+                    )
                 }
             }
+        }
+    }
+
+    private fun savePending(context: Context, number: String, mode: String) {
+        try {
+            context.getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
+                .edit()
+                .putString("flutter.pending_add_phone", number)
+                .putString("flutter.pending_add_mode", mode)
+                .apply()
+        } catch (_: Exception) {
         }
     }
 
@@ -55,21 +99,25 @@ class PhoneStateReceiver : BroadcastReceiver() {
         note: String?,
         mode: String
     ) {
+        // پاپ‌آپ روی صفحه (نه فقط نوار اعلان)
         try {
-            val i = Intent(context, CallAlertActivity::class.java).apply {
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
-                putExtra(CallAlertActivity.EXTRA_NUMBER, number)
-                putExtra(CallAlertActivity.EXTRA_MODE, mode)
-                if (name != null) putExtra(CallAlertActivity.EXTRA_NAME, name)
-                if (note != null) putExtra(CallAlertActivity.EXTRA_NOTE, note)
-            }
-            context.startActivity(i)
+            CallOverlayService.show(context, number, name, note, mode)
         } catch (_: Exception) {
-            // fallback: notification full-screen intent only
+            try {
+                val i = Intent(context, CallAlertActivity::class.java).apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                    putExtra(CallAlertActivity.EXTRA_NUMBER, number)
+                    putExtra(CallAlertActivity.EXTRA_MODE, mode)
+                    if (name != null) putExtra(CallAlertActivity.EXTRA_NAME, name)
+                    if (note != null) putExtra(CallAlertActivity.EXTRA_NOTE, note)
+                }
+                context.startActivity(i)
+            } catch (_: Exception) {
+            }
         }
     }
 
-    private fun showNotification(
+    private fun postNotif(
         context: Context,
         title: String,
         body: String,
@@ -78,19 +126,31 @@ class PhoneStateReceiver : BroadcastReceiver() {
         mode: String
     ) {
         val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        val channelId = "incoming_calls"
+        val channelId = "incoming_calls_v2"
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val ch = NotificationChannel(
                 channelId,
                 "تماس‌های ورودی",
                 NotificationManager.IMPORTANCE_HIGH
             ).apply {
-                description = "پاپ‌آپ شناسایی مشتری هنگام تماس"
+                description = "پاپ‌آپ و ذخیره مشتری هنگام تماس"
                 setShowBadge(true)
                 lockscreenVisibility = android.app.Notification.VISIBILITY_PUBLIC
+                enableVibration(true)
             }
             nm.createNotificationChannel(ch)
         }
+
+        // باز کردن اپ برای ذخیره (قابل اطمینان‌تر از Activity شفاف)
+        val mainIntent = Intent(context, MainActivity::class.java).apply {
+            action = MainActivity.ACTION_ADD_CUSTOMER
+            putExtra(MainActivity.EXTRA_NUMBER, number ?: "")
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+        }
+        val mainPi = PendingIntent.getActivity(
+            context, 2010, mainIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
 
         val alertIntent = Intent(context, CallAlertActivity::class.java).apply {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
@@ -99,11 +159,11 @@ class PhoneStateReceiver : BroadcastReceiver() {
             if (name != null) putExtra(CallAlertActivity.EXTRA_NAME, name)
         }
         val fullPi = PendingIntent.getActivity(
-            context, 2002, alertIntent,
+            context, 2011, alertIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val n = NotificationCompat.Builder(context, channelId)
+        val builder = NotificationCompat.Builder(context, channelId)
             .setSmallIcon(android.R.drawable.sym_call_incoming)
             .setContentTitle(title)
             .setContentText(body)
@@ -112,20 +172,32 @@ class PhoneStateReceiver : BroadcastReceiver() {
             .setCategory(NotificationCompat.CATEGORY_CALL)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setAutoCancel(true)
-            .setContentIntent(fullPi)
+            .setContentIntent(mainPi)
             .setFullScreenIntent(fullPi, true)
-            .build()
-        nm.notify(2001, n)
+
+        if (number != null && name == null) {
+            builder.addAction(
+                android.R.drawable.ic_input_add,
+                "ذخیره در دفترچه",
+                mainPi
+            )
+        }
+
+        nm.notify(2001, builder.build())
     }
+
+    private fun ltr(s: String): String = "\u200E$s\u200E"
 
     private fun lastKnownNumber(context: Context): String? {
         return try {
             context.contentResolver.query(
-                android.provider.CallLog.Calls.CONTENT_URI,
-                arrayOf(android.provider.CallLog.Calls.NUMBER),
+                CallLog.Calls.CONTENT_URI,
+                arrayOf(CallLog.Calls.NUMBER, CallLog.Calls.TYPE),
                 null, null,
-                android.provider.CallLog.Calls.DATE + " DESC"
-            )?.use { if (it.moveToFirst()) it.getString(0) else null }
+                CallLog.Calls.DATE + " DESC"
+            )?.use {
+                if (it.moveToFirst()) it.getString(0) else null
+            }
         } catch (_: Exception) {
             null
         }
@@ -167,5 +239,12 @@ class PhoneStateReceiver : BroadcastReceiver() {
         return if (p.length == 11 && p.startsWith("09")) {
             p.substring(0, 4) + " " + p.substring(4, 7) + " " + p.substring(7)
         } else p
+    }
+
+    companion object {
+        @Volatile private var lastNumber: String? = null
+        @Volatile private var lastWasIncoming: Boolean = false
+        const val MODE_RING = "ringing"
+        const val MODE_SAVE = "save"
     }
 }

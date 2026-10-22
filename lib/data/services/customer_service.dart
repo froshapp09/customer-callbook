@@ -191,7 +191,8 @@ class CustomerService {
     for (final e in list.take(15)) {
       final prev = CallRecord.fromJson(Map<String, dynamic>.from(e));
       if (Customer.normalizePhone(prev.phone) == norm &&
-          prev.type == type &&
+          // same phone within window = one event (avoid in+out double)
+          true && // was: prev.type == type &&
           (when.difference(prev.at).inSeconds).abs() < 120) {
         return; // skip near-duplicate
       }

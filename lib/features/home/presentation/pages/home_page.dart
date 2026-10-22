@@ -1,3 +1,4 @@
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/material.dart';
 import 'dart:io';
 import 'package:file_picker/file_picker.dart';
@@ -112,14 +113,42 @@ class _HomePageState extends State<HomePage> {
   }
 
   
-  Future<void> _checkPendingAdd() async {
+  
+  Future<void> _requestOverlay() async {
     try {
       const ch = MethodChannel('ir.apadanasleep.customer_callbook/call_log');
-      final n = await ch.invokeMethod<String>('getPendingAddPhone');
+      await ch.invokeMethod('openOverlayPermission');
+    } catch (_) {
+      await openAppSettings();
+    }
+  }
+
+  Future<void> _checkPendingAdd() async {
+    try {
+      String? n;
+      try {
+        const ch = MethodChannel('ir.apadanasleep.customer_callbook/call_log');
+        n = await ch.invokeMethod<String>('getPendingAddPhone');
+      } catch (_) {}
+      if (n == null || n.isEmpty) {
+        final p = await SharedPreferences.getInstance();
+        n = p.getString('pending_add_phone');
+        if (n != null) {
+          await p.remove('pending_add_phone');
+          await p.remove('pending_add_mode');
+        }
+      }
       if (n == null || n.isEmpty || !mounted) return;
       await Navigator.of(context).push(
         MaterialPageRoute(builder: (_) => AddCustomerPage(initialPhone: n)),
       );
+    } catch (_) {}
+  }
+
+  
+  Future<void> _openOverlayPermission() async {
+    try {
+      await openAppSettings();
     } catch (_) {}
   }
 
@@ -527,6 +556,16 @@ class _SettingsTab extends StatelessWidget {
         const SizedBox(height: 20),
         const _CallDetectTile(),
         const SizedBox(height: 10),
+        _tile(context, Icons.layers_rounded, const Color(0xFFFF8C3A), 'پاپ‌آپ روی صفحه',
+            'نمایش روی تماس و سایر برنامه‌ها (لازم)', () async {
+          try {
+            const ch = MethodChannel('ir.apadanasleep.customer_callbook/call_log');
+            await ch.invokeMethod('openOverlayPermission');
+          } catch (_) {
+            await openAppSettings();
+          }
+        }),
+        const SizedBox(height: 10),
         _tile(context, Icons.phone_android_rounded, AppColors.primary, 'تماس‌های گوشی', 'خواندن تاریخچه و افزودن', () async {
           await Navigator.push(context, MaterialPageRoute(builder: (_) => const CallSyncPage()));
           onReload();
@@ -692,6 +731,17 @@ class _CallDetectTileState extends State<_CallDetectTile> {
             const SnackBar(content: Text('مجوز تلفن لازم است. از تنظیمات مجوز بدهید.')),
           );
           await openAppSettings();
+        } else if (ok && mounted) {
+          try {
+            const ch = MethodChannel('ir.apadanasleep.customer_callbook/call_log');
+            final can = await ch.invokeMethod<bool>('canDrawOverlays') ?? false;
+            if (!can) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('برای پاپ‌آپ روی صفحه تماس، مجوز «نمایش روی سایر برنامه‌ها» را بدهید')),
+              );
+              await ch.invokeMethod('openOverlayPermission');
+            }
+          } catch (_) {}
         }
         setState(() => _on = ok);
       } else {

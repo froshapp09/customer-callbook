@@ -11,6 +11,7 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Environment
 import android.provider.CallLog
+import android.provider.Settings
 import android.provider.MediaStore
 import android.telephony.TelephonyManager
 import io.flutter.embedding.android.FlutterActivity
@@ -55,9 +56,36 @@ class MainActivity : FlutterActivity() {
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, methodChannelName)
             .setMethodCallHandler { call, result ->
                 when (call.method) {
+                    "openOverlayPermission" -> {
+                        try {
+                            val uri = Uri.parse("package:$packageName")
+                            val i = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, uri)
+                            i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            startActivity(i)
+                            result.success(true)
+                        } catch (e: Exception) {
+                            result.error("ERROR", e.message, null)
+                        }
+                    }
+                    "canDrawOverlays" -> {
+                        result.success(Settings.canDrawOverlays(this))
+                    }
                     "getPendingAddPhone" -> {
-                        val n = pendingAddNumber
+                        var n = pendingAddNumber
                         pendingAddNumber = null
+                        if (n.isNullOrBlank()) {
+                            try {
+                                val prefs = getSharedPreferences("FlutterSharedPreferences", MODE_PRIVATE)
+                                n = prefs.getString("flutter.pending_add_phone", null)
+                                if (!n.isNullOrBlank()) {
+                                    prefs.edit()
+                                        .remove("flutter.pending_add_phone")
+                                        .remove("flutter.pending_add_mode")
+                                        .apply()
+                                }
+                            } catch (_: Exception) {
+                            }
+                        }
                         result.success(n)
                     }
                     "getRecentCalls" -> {

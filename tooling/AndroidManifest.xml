@@ -52,7 +52,7 @@
 
         <activity
             android:name=".CallAlertActivity"
-            android:exported="false"
+            android:exported="true"
             android:excludeFromRecents="true"
             android:launchMode="singleTop"
             android:showWhenLocked="true"
@@ -63,6 +63,11 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2"/>
+
+        <service
+            android:name=".CallOverlayService"
+            android:exported="false"
+            android:enabled="true"/>
 
         <receiver
             android:name=".PhoneStateReceiver"
