@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Force compileSdk 35. Widget resources written but NOT registered in manifest (avoids aapt fail)."""
+"""Copy native sources + force compileSdk 35. No widget in manifest."""
 from pathlib import Path
 import re
 import shutil
@@ -19,14 +19,17 @@ def patch_sdk() -> None:
         return
     for f in android.rglob("build.gradle*"):
         t = f.read_text(encoding="utf-8")
-        orig = t
+        t = t.replace("compileSdk = flutter.compileSdkVersion", "compileSdk = 35")
+        t = t.replace("targetSdk = flutter.targetSdkVersion", "targetSdk = 35")
+        t = t.replace("compileSdk flutter.compileSdkVersion", "compileSdk 35")
+        t = t.replace("targetSdk flutter.targetSdkVersion", "targetSdk 35")
         t = re.sub(r"compileSdk(?:Version)?\s*=\s*[^\n]+", "compileSdk = 35", t)
         t = re.sub(r"compileSdkVersion\s+[^\n]+", "compileSdk 35", t)
         t = re.sub(r"targetSdk(?:Version)?\s*=\s*[^\n]+", "targetSdk = 35", t)
         t = re.sub(r"targetSdkVersion\s+[^\n]+", "targetSdkVersion 35", t)
-        # also force in local.properties / flutter defaults if present
-        if t != orig:
-            f.write_text(t, encoding="utf-8")
+        if "compileSdk" not in t and "android {" in t:
+            t = t.replace("android {", "android {\n    compileSdk = 35", 1)
+        f.write_text(t, encoding="utf-8")
         print("sdk", f)
         for line in f.read_text().splitlines():
             if "compileSdk" in line or "targetSdk" in line:
@@ -37,23 +40,27 @@ def main() -> None:
     if not APP.exists():
         raise SystemExit("android/app missing")
 
-    # copy kotlin (call alert, phone receiver, main)
     KT.mkdir(parents=True, exist_ok=True)
+    # MainActivity.kt now contains CallMonitorService class too
     for name in (
         "MainActivity.kt",
         "PhoneStateReceiver.kt",
         "BootReceiver.kt",
         "CallAlertActivity.kt",
         "CallOverlayService.kt",
-        "CallMonitorService.kt",
         "DaftarcheWidgetProvider.kt",
     ):
         src = TOOLING / name
         if src.exists():
             shutil.copy2(src, KT / name)
-            print("kt", name)
+            print("kt", name, "bytes", src.stat().st_size)
 
-    # widget resource files (for future enable; not referenced in manifest)
+    # Verify CallMonitorService is available either as file or inside MainActivity
+    main_kt = (KT / "MainActivity.kt").read_text(encoding="utf-8")
+    if "class CallMonitorService" not in main_kt:
+        raise SystemExit("CallMonitorService class missing from MainActivity.kt")
+    print("CallMonitorService OK")
+
     for sub, name in [
         ("layout", "daftarche_widget.xml"),
         ("xml", "daftarche_widget_info.xml"),
@@ -64,18 +71,16 @@ def main() -> None:
             dst = RES / sub / name
             dst.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(src, dst)
-            print("res", dst)
 
-    # manifest WITHOUT widget receiver
     shutil.copy2(TOOLING / "AndroidManifest.xml", MANIFEST)
     text = MANIFEST.read_text(encoding="utf-8")
     if "daftarche_widget_info" in text:
         raise SystemExit("BUG: manifest still references widget xml")
     if "PhoneStateReceiver" not in text:
         raise SystemExit("BUG: PhoneStateReceiver missing from manifest")
-    if "CallAlertActivity" not in text:
-        raise SystemExit("BUG: CallAlertActivity missing from manifest")
-    print("manifest OK (no widget ref)")
+    if "CallMonitorService" not in text:
+        raise SystemExit("BUG: CallMonitorService missing from manifest")
+    print("manifest OK")
 
     patch_sdk()
     print("SUCCESS prepare_android")
