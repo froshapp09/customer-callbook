@@ -87,6 +87,9 @@ class CallListenerService {
       await initNotifications();
       if (await Permission.phone.isGranted) {
         await startListening();
+        try {
+          await _methodChannel.invokeMethod('startCallMonitor');
+        } catch (_) {}
         if (_isListening) await _showMonitorNotification();
       }
     }
@@ -102,6 +105,11 @@ class CallListenerService {
 
     try {
       await _methodChannel.invokeMethod('startPhoneListen');
+      try {
+        await _methodChannel.invokeMethod('startCallMonitor');
+      } catch (e) {
+        debugPrint("startCallMonitor: $e");
+      }
     } catch (e) {
       debugPrint('startPhoneListen native: $e');
     }
@@ -154,6 +162,9 @@ class CallListenerService {
     _isListening = false;
     try {
       await _methodChannel.invokeMethod('stopPhoneListen');
+      try {
+        await _methodChannel.invokeMethod('stopCallMonitor');
+      } catch (_) {}
     } catch (_) {}
   }
 

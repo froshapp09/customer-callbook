@@ -45,6 +45,7 @@ def main() -> None:
         "BootReceiver.kt",
         "CallAlertActivity.kt",
         "CallOverlayService.kt",
+        "CallMonitorService.kt",
         "DaftarcheWidgetProvider.kt",
     ):
         src = TOOLING / name

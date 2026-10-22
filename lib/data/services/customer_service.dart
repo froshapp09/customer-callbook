@@ -193,7 +193,7 @@ class CustomerService {
       if (Customer.normalizePhone(prev.phone) == norm &&
           // same phone within window = one event (avoid in+out double)
           true && // was: prev.type == type &&
-          (when.difference(prev.at).inSeconds).abs() < 120) {
+          (when.difference(prev.at).inSeconds).abs() < 180) {
         return; // skip near-duplicate
       }
     }
@@ -248,7 +248,7 @@ class CustomerService {
       final dup = kept.any((k) =>
           Customer.normalizePhone(k.phone) == Customer.normalizePhone(r.phone) &&
           k.type == r.type &&
-          (k.at.difference(r.at).inSeconds).abs() < 120);
+          (k.at.difference(r.at).inSeconds).abs() < 180);
       if (!dup) kept.add(r);
     }
     final removed = list.length - kept.length;

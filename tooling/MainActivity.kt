@@ -98,6 +98,22 @@ class MainActivity : FlutterActivity() {
                             result.error("ERROR", e.message, null)
                         }
                     }
+                    "startCallMonitor" -> {
+                        try {
+                            CallMonitorService.start(this)
+                            result.success(true)
+                        } catch (e: Exception) {
+                            result.error("ERROR", e.message, null)
+                        }
+                    }
+                    "stopCallMonitor" -> {
+                        try {
+                            CallMonitorService.stop(this)
+                            result.success(true)
+                        } catch (e: Exception) {
+                            result.error("ERROR", e.message, null)
+                        }
+                    }
                     "startPhoneListen" -> {
                         try {
                             startReceiver()
