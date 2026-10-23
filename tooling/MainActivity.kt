@@ -516,11 +516,11 @@ class CallMonitorService : Service() {
             val prefs = getSharedPreferences("FlutterSharedPreferences", MODE_PRIVATE)
             val raw = prefs.getString("flutter.customers_v2", null) ?: return null
             val arr = JSONArray(raw)
-            val norm = normalize(phone)
+            val key = matchKey(phone)
             for (i in 0 until arr.length()) {
                 val o = arr.getJSONObject(i)
-                val p = normalize(o.optString("phone", ""))
-                if (p.isNotEmpty() && (p == norm || p.endsWith(norm.takeLast(10)) || norm.endsWith(p.takeLast(10)))) {
+                val p = matchKey(o.optString("phone", ""))
+                if (p.isNotEmpty() && p == key) {
                     return Triple(
                         o.optString("name", phone).ifBlank { phone },
                         o.optString("tag", ""),
@@ -535,11 +535,23 @@ class CallMonitorService : Service() {
     }
 
     private fun normalize(phone: String): String {
-        var p = phone.replace(Regex("[\\s\\-()]"), "")
+        var p = phone
+        val fa = "۰۱۲۳۴۵۶۷۸۹"
+        val ar = "٠١٢٣٤٥٦٧٨٩"
+        for (i in 0..9) {
+            p = p.replace(fa[i].toString(), i.toString()).replace(ar[i].toString(), i.toString())
+        }
+        p = p.replace(Regex("[^\\d+]"), "")
         if (p.startsWith("+98")) p = "0" + p.substring(3)
         if (p.startsWith("0098")) p = "0" + p.substring(4)
         if (p.startsWith("98") && p.length >= 12) p = "0" + p.substring(2)
+        if (p.startsWith("9") && p.length == 10) p = "0" + p
         return p
+    }
+
+    private fun matchKey(phone: String): String {
+        val p = normalize(phone)
+        return if (p.length >= 10) p.takeLast(10) else p
     }
 
     private fun stopListen() {
@@ -1355,11 +1367,11 @@ class PhoneStateReceiver : BroadcastReceiver() {
             val prefs = context.getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
             val raw = prefs.getString("flutter.customers_v2", null) ?: return null
             val arr = JSONArray(raw)
-            val norm = normalize(phone)
+            val key = matchKey(phone)
             for (i in 0 until arr.length()) {
                 val o = arr.getJSONObject(i)
-                val p = normalize(o.optString("phone", ""))
-                if (p.isNotEmpty() && (p == norm || p.endsWith(norm.takeLast(10)) || norm.endsWith(p.takeLast(10)))) {
+                val p = matchKey(o.optString("phone", ""))
+                if (p.isNotEmpty() && p == key) {
                     return Triple(
                         o.optString("name", phone).ifBlank { phone },
                         o.optString("tag", ""),
@@ -1374,11 +1386,23 @@ class PhoneStateReceiver : BroadcastReceiver() {
     }
 
     private fun normalize(phone: String): String {
-        var p = phone.replace(Regex("[\\s\\-()]"), "")
+        var p = phone
+        val fa = "۰۱۲۳۴۵۶۷۸۹"
+        val ar = "٠١٢٣٤٥٦٧٨٩"
+        for (i in 0..9) {
+            p = p.replace(fa[i].toString(), i.toString()).replace(ar[i].toString(), i.toString())
+        }
+        p = p.replace(Regex("[^\\d+]"), "")
         if (p.startsWith("+98")) p = "0" + p.substring(3)
         if (p.startsWith("0098")) p = "0" + p.substring(4)
         if (p.startsWith("98") && p.length >= 12) p = "0" + p.substring(2)
+        if (p.startsWith("9") && p.length == 10) p = "0" + p
         return p
+    }
+
+    private fun matchKey(phone: String): String {
+        val p = normalize(phone)
+        return if (p.length >= 10) p.takeLast(10) else p
     }
 
     private fun formatPhone(phone: String): String {

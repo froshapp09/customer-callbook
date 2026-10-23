@@ -42,10 +42,11 @@ class _HistoryPageState extends State<HistoryPage> {
   Future<void> _load() async {
     setState(() => _loading = true);
     await _service.dedupeCallHistory();
-    final records = await _service.getCallHistory(limit: 300);
+    final records = await _service.getCallHistory(limit: 500);
     final customers = await _service.getAll();
     final map = <String, Customer>{};
     for (final c in customers) {
+      map[Customer.matchKey(c.phone)] = c;
       map[Customer.normalizePhone(c.phone)] = c;
     }
     if (mounted) {
@@ -59,43 +60,61 @@ class _HistoryPageState extends State<HistoryPage> {
 
   DateTime get _fromDate {
     final now = DateTime.now();
+    // ابتدای امروز محلی
     final today = DateTime(now.year, now.month, now.day);
     switch (_range) {
-      case 1:
-        return today.subtract(const Duration(days: 30));
-      case 2:
-        return today.subtract(const Duration(days: 365));
+      case 1: // ماه: ۳۰ روز قبل تا آخر امروز
+        return today.subtract(const Duration(days: 29));
+      case 2: // سال: ۳۶۵ روز
+        return today.subtract(const Duration(days: 364));
       default:
-        // هفته شمسی: از شنبه
-        final weekday = now.weekday; // Mon=1 .. Sun=7
-        // شنبه در DateTime = 6
-        final daysFromSat = (weekday == 7) ? 6 : (weekday % 7); // rough
-        // بهتر: شنبه = روزی که weekday==6
+        // هفته شمسی از شنبه (شامل امروز)
         var d = today;
-        while (d.weekday != 6) {
+        while (d.weekday != DateTime.saturday) {
           d = d.subtract(const Duration(days: 1));
         }
         return d;
     }
   }
 
-  List<CallRecord> get _filtered {
-    final from = _fromDate;
-    return _all.where((r) => !r.at.isBefore(from)).toList();
+  /// پایان بازه = فردا ۰۰:۰۰ تا تماس‌های امروز کامل دیده شوند
+  DateTime get _toDate {
+    final now = DateTime.now();
+    return DateTime(now.year, now.month, now.day).add(const Duration(days: 1));
   }
 
-  /// گروه‌بندی بر اساس روز هفته شمسی (شنبه=0)
+  List<CallRecord> get _filtered {
+    final from = _fromDate;
+    final to = _toDate;
+    return _all.where((r) {
+      final at = r.at.toLocal();
+      return !at.isBefore(from) && at.isBefore(to);
+    }).toList();
+  }
+
+  /// هفته: بر اساس نام روز؛ ماه/سال: بر اساس تاریخ شمسی
   Map<String, List<CallRecord>> get _grouped {
-    final map = {for (final d in _weekDays) d: <CallRecord>[]};
-    for (final r in _filtered) {
-      final name = _weekDays[_shamsiWeekIndex(r.at)];
-      map[name]!.add(r);
+    if (_range == 0) {
+      final map = {for (final d in _weekDays) d: <CallRecord>[]};
+      for (final r in _filtered) {
+        final name = _weekDays[_shamsiWeekIndex(r.at.toLocal())];
+        map[name]!.add(r);
+      }
+      return {
+        for (final d in _weekDays)
+          if (map[d]!.isNotEmpty) d: map[d]!,
+      };
     }
-    // فقط روزهایی که تماس دارند + ترتیب شنبه→جمعه
-    return {
-      for (final d in _weekDays)
-        if (map[d]!.isNotEmpty) d: map[d]!,
-    };
+    // ماه و سال: گروه‌بندی با تاریخ شمسی (جدید به قدیم)
+    final map = <String, List<CallRecord>>{};
+    for (final r in _filtered) {
+      final at = r.at.toLocal();
+      final key = Jalali.format(at); // مثلاً ۱۴۰۴/۰۷/۳۰
+      map.putIfAbsent(key, () => []).add(r);
+    }
+    final keys = map.keys.toList()
+      ..sort((a, b) => b.compareTo(a));
+    return {for (final k in keys) k: map[k]!};
   }
 
   /// ایندکس روز هفته شمسی: شنبه=0 ... جمعه=6
@@ -233,8 +252,8 @@ class _HistoryPageState extends State<HistoryPage> {
                           count: items.length,
                           children: items.map((r) {
                             final phone = Customer.normalizePhone(r.phone);
-                            final customer = _byPhone[phone];
-                            final name = customer?.name ?? phone;
+                            final customer = _byPhone[Customer.matchKey(r.phone)] ?? _byPhone[phone];
+                            final name = customer?.name ?? Customer.displayPhone(phone);
                             return _HistoryTile(
                               name: name,
                               phone: r.phone,

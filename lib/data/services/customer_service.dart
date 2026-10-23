@@ -49,7 +49,7 @@ class CustomerService {
     final all = await getAll();
     // جلوگیری از تکراری
     final norm = Customer.normalizePhone(c.phone);
-    final idx = all.indexWhere((e) => Customer.normalizePhone(e.phone) == norm);
+    final idx = all.indexWhere((e) => Customer.samePhone(e.phone, norm));
     if (idx >= 0) {
       final existing = all[idx];
       final updated = existing.copyWith(
@@ -86,7 +86,7 @@ class CustomerService {
     final norm = Customer.normalizePhone(phone);
     final all = await getAll();
     try {
-      return all.firstWhere((e) => Customer.normalizePhone(e.phone) == norm);
+      return all.firstWhere((e) => Customer.samePhone(e.phone, norm));
     } catch (_) {
       return null;
     }

@@ -125,11 +125,34 @@ class Customer {
       );
 
   static String normalizePhone(String phone) {
-    var p = phone.replaceAll(RegExp(r'[\s\-\(\)]'), '');
+    // ارقام فارسی/عربی → انگلیسی
+    const fa = '۰۱۲۳۴۵۶۷۸۹';
+    const ar = '٠١٢٣٤٥٦٧٨٩';
+    var p = phone;
+    for (var i = 0; i < 10; i++) {
+      p = p.replaceAll(fa[i], '$i').replaceAll(ar[i], '$i');
+    }
+    p = p.replaceAll(RegExp(r'[^\d+]'), '');
     if (p.startsWith('+98')) p = '0${p.substring(3)}';
     if (p.startsWith('0098')) p = '0${p.substring(4)}';
     if (p.startsWith('98') && p.length >= 12) p = '0${p.substring(2)}';
+    // موبایل بدون صفر اول: 9xxxxxxxxx
+    if (p.startsWith('9') && p.length == 10) p = '0$p';
     return p;
+  }
+
+  /// کلید تطبیق (۱۰ رقم آخر) — برای شناسایی یکسان با گوشی
+  static String matchKey(String phone) {
+    final p = normalizePhone(phone);
+    if (p.length >= 10) return p.substring(p.length - 10);
+    return p;
+  }
+
+  static bool samePhone(String a, String b) {
+    final ka = matchKey(a);
+    final kb = matchKey(b);
+    if (ka.isEmpty || kb.isEmpty) return false;
+    return ka == kb;
   }
 
   static String displayPhone(String phone) {
