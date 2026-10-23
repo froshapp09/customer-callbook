@@ -62,6 +62,7 @@ class CallListenerService {
 
   Future<bool> requestPermissions() async {
     final phone = await Permission.phone.request();
+    await Permission.contacts.request();
     await Permission.notification.request();
     return phone.isGranted;
   }

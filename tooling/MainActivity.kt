@@ -24,6 +24,7 @@ import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import android.provider.CallLog
+import android.provider.ContactsContract
 import android.provider.MediaStore
 import android.provider.Settings
 import android.telephony.PhoneStateListener
@@ -512,20 +513,68 @@ class CallMonitorService : Service() {
     }
 
     private fun findCustomer(phone: String): Triple<String, String, String?>? {
-        return try {
+        // ۱) دفترچه اپ
+        try {
             val prefs = getSharedPreferences("FlutterSharedPreferences", MODE_PRIVATE)
-            val raw = prefs.getString("flutter.customers_v2", null) ?: return null
-            val arr = JSONArray(raw)
+            val raw = prefs.getString("flutter.customers_v2", null)
+            if (raw != null) {
+                val arr = JSONArray(raw)
+                val key = matchKey(phone)
+                for (i in 0 until arr.length()) {
+                    val o = arr.getJSONObject(i)
+                    val p = matchKey(o.optString("phone", ""))
+                    if (p.isNotEmpty() && p == key) {
+                        return Triple(
+                            o.optString("name", phone).ifBlank { phone },
+                            o.optString("tag", ""),
+                            o.optString("note", null)
+                        )
+                    }
+                }
+            }
+        } catch (_: Exception) {
+        }
+        // ۲) مخاطبین گوشی
+        val contactName = findDeviceContactName(this, phone)
+        if (!contactName.isNullOrBlank()) {
+            return Triple(contactName, "مخاطب", "از مخاطبین گوشی")
+        }
+        return null
+    }
+
+    private fun findDeviceContactName(context: Context, phone: String): String? {
+        return try {
+            val uri = android.net.Uri.withAppendedPath(
+                ContactsContract.PhoneLookup.CONTENT_FILTER_URI,
+                android.net.Uri.encode(phone)
+            )
+            context.contentResolver.query(
+                uri,
+                arrayOf(ContactsContract.PhoneLookup.DISPLAY_NAME),
+                null, null, null
+            )?.use {
+                if (it.moveToFirst()) {
+                    val n = it.getString(0)
+                    if (!n.isNullOrBlank()) return n
+                }
+            }
+            // fallback: ۱۰ رقم آخر
             val key = matchKey(phone)
-            for (i in 0 until arr.length()) {
-                val o = arr.getJSONObject(i)
-                val p = matchKey(o.optString("phone", ""))
-                if (p.isNotEmpty() && p == key) {
-                    return Triple(
-                        o.optString("name", phone).ifBlank { phone },
-                        o.optString("tag", ""),
-                        o.optString("note", null)
-                    )
+            if (key.length < 8) return null
+            context.contentResolver.query(
+                ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
+                arrayOf(
+                    ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME,
+                    ContactsContract.CommonDataKinds.Phone.NUMBER
+                ),
+                null, null, null
+            )?.use {
+                while (it.moveToNext()) {
+                    val num = it.getString(1) ?: continue
+                    if (matchKey(num) == key) {
+                        val n = it.getString(0)
+                        if (!n.isNullOrBlank()) return n
+                    }
                 }
             }
             null
@@ -833,6 +882,12 @@ class CallOverlayService : Service() {
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
                 }
                 startActivity(i)
+                remove()
+                stopSelf()
+            })
+        } else if (note == "از مخاطبین گوشی") {
+            // فقط مخاطب گوشی است — نیازی به ذخیره در اپ نیست
+            card.addView(makeBtn("متوجه شدم", Color.parseColor("#2A3142"), Color.parseColor("#B0B8C8")) {
                 remove()
                 stopSelf()
             })
@@ -1189,7 +1244,6 @@ class PhoneStateReceiver : BroadcastReceiver() {
             TelephonyManager.EXTRA_STATE_RINGING -> {
                 if (number.isNullOrBlank()) number = lastNumber
                 if (number.isNullOrBlank()) {
-                    postNotif(context, "تماس ورودی", "شماره در دسترس نیست", null, null, MODE_RING)
                     return
                 }
                 lastWasIncoming = true
@@ -1226,14 +1280,6 @@ class PhoneStateReceiver : BroadcastReceiver() {
                 if (c == null) {
                     savePending(context, n, MODE_SAVE)
                     openAlert(context, n, null, null, MODE_SAVE)
-                    postNotif(
-                        context,
-                        "مشتری جدید",
-                        ltr(formatPhone(n)) + " · ذخیره شود؟",
-                        n,
-                        null,
-                        MODE_SAVE
-                    )
                 }
             }
         }
@@ -1363,20 +1409,65 @@ class PhoneStateReceiver : BroadcastReceiver() {
     }
 
     private fun findCustomer(context: Context, phone: String): Triple<String, String, String?>? {
-        return try {
+        try {
             val prefs = context.getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
-            val raw = prefs.getString("flutter.customers_v2", null) ?: return null
-            val arr = JSONArray(raw)
+            val raw = prefs.getString("flutter.customers_v2", null)
+            if (raw != null) {
+                val arr = JSONArray(raw)
+                val key = matchKey(phone)
+                for (i in 0 until arr.length()) {
+                    val o = arr.getJSONObject(i)
+                    val p = matchKey(o.optString("phone", ""))
+                    if (p.isNotEmpty() && p == key) {
+                        return Triple(
+                            o.optString("name", phone).ifBlank { phone },
+                            o.optString("tag", ""),
+                            o.optString("note", null)
+                        )
+                    }
+                }
+            }
+        } catch (_: Exception) {
+        }
+        val contactName = findDeviceContactName(context, phone)
+        if (!contactName.isNullOrBlank()) {
+            return Triple(contactName, "مخاطب", "از مخاطبین گوشی")
+        }
+        return null
+    }
+
+    private fun findDeviceContactName(context: Context, phone: String): String? {
+        return try {
+            val uri = android.net.Uri.withAppendedPath(
+                ContactsContract.PhoneLookup.CONTENT_FILTER_URI,
+                android.net.Uri.encode(phone)
+            )
+            context.contentResolver.query(
+                uri,
+                arrayOf(ContactsContract.PhoneLookup.DISPLAY_NAME),
+                null, null, null
+            )?.use {
+                if (it.moveToFirst()) {
+                    val n = it.getString(0)
+                    if (!n.isNullOrBlank()) return n
+                }
+            }
             val key = matchKey(phone)
-            for (i in 0 until arr.length()) {
-                val o = arr.getJSONObject(i)
-                val p = matchKey(o.optString("phone", ""))
-                if (p.isNotEmpty() && p == key) {
-                    return Triple(
-                        o.optString("name", phone).ifBlank { phone },
-                        o.optString("tag", ""),
-                        o.optString("note", null)
-                    )
+            if (key.length < 8) return null
+            context.contentResolver.query(
+                ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
+                arrayOf(
+                    ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME,
+                    ContactsContract.CommonDataKinds.Phone.NUMBER
+                ),
+                null, null, null
+            )?.use {
+                while (it.moveToNext()) {
+                    val num = it.getString(1) ?: continue
+                    if (matchKey(num) == key) {
+                        val n = it.getString(0)
+                        if (!n.isNullOrBlank()) return n
+                    }
                 }
             }
             null
