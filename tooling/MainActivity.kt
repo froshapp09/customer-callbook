@@ -1,5 +1,11 @@
 package ir.apadanasleep.customer_callbook
 
+import android.widget.RemoteViews
+
+import android.appwidget.AppWidgetProvider
+
+import android.appwidget.AppWidgetManager
+
 import android.app.Activity
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -100,6 +106,17 @@ class MainActivity : FlutterActivity() {
                     }
                     "canDrawOverlays" -> {
                         result.success(Settings.canDrawOverlays(this))
+                    }
+                    "clearPendingAddPhone" -> {
+                        pendingAddNumber = null
+                        try {
+                            getSharedPreferences("FlutterSharedPreferences", MODE_PRIVATE)
+                                .edit()
+                                .remove("flutter.pending_add_phone")
+                                .remove("flutter.pending_add_mode")
+                                .apply()
+                        } catch (_: Exception) {}
+                        result.success(true)
                     }
                     "getPendingAddPhone" -> {
                         var n = pendingAddNumber
@@ -1604,3 +1621,60 @@ class BootReceiver : BroadcastReceiver() {
         // Manifest PHONE_STATE receiver is enough; boot just ensures app data is warm.
     }
 }
+
+
+class DaftarcheWidgetProvider : AppWidgetProvider() {
+    override fun onUpdate(
+        context: Context,
+        appWidgetManager: AppWidgetManager,
+        appWidgetIds: IntArray
+    ) {
+        for (id in appWidgetIds) {
+            updateOne(context, appWidgetManager, id)
+        }
+    }
+
+    override fun onEnabled(context: Context) {
+        // first widget added
+    }
+
+    companion object {
+        fun updateOne(context: Context, manager: AppWidgetManager, widgetId: Int) {
+            val views = RemoteViews(context.packageName, R.layout.daftarche_widget)
+            val prefs = context.getSharedPreferences("HomeWidgetPreferences", Context.MODE_PRIVATE)
+            // home_widget package stores with flutter-style or direct keys
+            val count = prefs.getString("widget_count", null)
+                ?: context.getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
+                    .getString("flutter.widget_count", "0")
+                ?: "0"
+            val line1 = prefs.getString("widget_line1", null)
+                ?: context.getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
+                    .getString("flutter.widget_line1", "تماس امروزی ثبت نشده")
+                ?: "تماس امروزی ثبت نشده"
+            val line2 = prefs.getString("widget_line2", null)
+                ?: context.getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
+                    .getString("flutter.widget_line2", "")
+                ?: ""
+            val line3 = prefs.getString("widget_line3", null)
+                ?: context.getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
+                    .getString("flutter.widget_line3", "")
+                ?: ""
+
+            views.setTextViewText(R.id.widget_count, count)
+            views.setTextViewText(R.id.widget_line1, line1)
+            views.setTextViewText(R.id.widget_line2, line2)
+            views.setTextViewText(R.id.widget_line3, line3)
+
+            val launch = context.packageManager.getLaunchIntentForPackage(context.packageName)
+            if (launch != null) {
+                val pi = PendingIntent.getActivity(
+                    context, 0, launch,
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                )
+                views.setOnClickPendingIntent(R.id.widget_root, pi)
+            }
+            manager.updateAppWidget(widgetId, views)
+        }
+    }
+}
+

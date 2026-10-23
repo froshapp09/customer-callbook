@@ -132,13 +132,25 @@ class _HomePageState extends State<HomePage> {
       } catch (_) {}
       if (n == null || n.isEmpty) {
         final p = await SharedPreferences.getInstance();
-        n = p.getString('pending_add_phone');
+        n = p.getString('pending_add_phone') ?? p.getString('flutter.pending_add_phone');
         if (n != null) {
           await p.remove('pending_add_phone');
           await p.remove('pending_add_mode');
+          await p.remove('flutter.pending_add_phone');
+          await p.remove('flutter.pending_add_mode');
         }
       }
       if (n == null || n.isEmpty || !mounted) return;
+      // اگر از قبل در دفترچه است، صفحه افزودن باز نشود
+      final existing = await _service.findByPhone(n);
+      if (existing != null) {
+        try {
+          const ch = MethodChannel('ir.apadanasleep.customer_callbook/call_log');
+          await ch.invokeMethod('clearPendingAddPhone');
+        } catch (_) {}
+        return;
+      }
+      if (!mounted) return;
       await Navigator.of(context).push(
         MaterialPageRoute(builder: (_) => AddCustomerPage(initialPhone: n)),
       );
@@ -556,21 +568,15 @@ class _SettingsTab extends StatelessWidget {
         const SizedBox(height: 20),
         const _CallDetectTile(),
         const SizedBox(height: 10),
-        _tile(context, Icons.layers_rounded, const Color(0xFFFF8C3A), 'پاپ‌آپ روی صفحه',
-            'نمایش روی تماس و سایر برنامه‌ها (لازم)', () async {
-          try {
-            const ch = MethodChannel('ir.apadanasleep.customer_callbook/call_log');
-            await ch.invokeMethod('openOverlayPermission');
-          } catch (_) {
-            await openAppSettings();
-          }
+        _tile(context, Icons.admin_panel_settings_rounded, AppColors.info, 'مرکز مجوزها',
+            'تلفن، مخاطبین، اعلان، پاپ‌آپ روی صفحه', () {
+          Navigator.push(context, MaterialPageRoute(builder: (_) => const _PermissionsHubPage()));
         }),
         const SizedBox(height: 10),
         _tile(context, Icons.phone_android_rounded, AppColors.primary, 'تماس‌های گوشی', 'خواندن تاریخچه و افزودن', () async {
           await Navigator.push(context, MaterialPageRoute(builder: (_) => const CallSyncPage()));
           onReload();
         }),
-        _tile(context, Icons.shield_rounded, AppColors.info, 'مجوزهای برنامه', 'تلفن، مخاطبین، پیامک', () => openAppSettings()),
         _tile(context, Icons.palette_rounded, AppColors.warning, 'رنگ دسته‌بندی‌ها', 'مشتری، همکار، سایر', () {
           Navigator.push(context, MaterialPageRoute(builder: (_) => const _TagColorPage()));
         }),
@@ -586,16 +592,33 @@ class _SettingsTab extends StatelessWidget {
           Navigator.push(context, MaterialPageRoute(builder: (_) => _BackupPage(onDone: onReload)));
         }),
         const SizedBox(height: 10),
-        _tile(context, Icons.upload_file_rounded, const Color(0xFFA78BFA), 'خروجی لیست مشتریان', 'CSV برای پنل پیامک', () async {
+        _tile(context, Icons.upload_file_rounded, const Color(0xFFA78BFA), 'خروجی لیست مشتریان', 'ذخیره CSV در پوشه دانلود', () async {
           if (customers.isEmpty) {
             ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('مشتری‌ای نیست')));
             return;
           }
-          final buf = StringBuffer('نام,شماره,تگ,تعداد تماس\n');
+          final buf = StringBuffer('نام,شماره,تگ,یادداشت,تعداد تماس\n');
           for (final c in customers) {
-            buf.writeln('${c.name},${c.phone},${c.tag},${c.callCount}');
+            final note = (c.note ?? '').replaceAll(',', '،').replaceAll('\n', ' ');
+            buf.writeln('${c.name},${c.phone},${c.tag},$note,${c.callCount}');
           }
-          await Share.share(buf.toString(), subject: 'لیست مشتریان');
+          try {
+            const ch = MethodChannel('ir.apadanasleep.customer_callbook/call_log');
+            final name = 'customers_${DateTime.now().millisecondsSinceEpoch}.csv';
+            final path = await ch.invokeMethod<String>('saveBackupFile', {
+              'name': name,
+              'content': buf.toString(),
+            });
+            if (context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('ذخیره شد: ${path ?? name}')),
+              );
+            }
+          } catch (e) {
+            if (context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطا در ذخیره: $e')));
+            }
+          }
         }),
         _tile(context, Icons.info_rounded, AppColors.textMuted, 'درباره برنامه', 'نسخه ۱.۲۱.۰ (۳۸) — info@apadanasleep.ir', () {
           Navigator.push(context, MaterialPageRoute(builder: (_) => const _AboutPage()));
@@ -1073,6 +1096,79 @@ class _AboutPage extends StatelessWidget {
           Text(
             'آپادانا اسلیپ',
             textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+
+class _PermissionsHubPage extends StatelessWidget {
+  const _PermissionsHubPage();
+
+  Future<void> _openOverlay() async {
+    try {
+      const ch = MethodChannel('ir.apadanasleep.customer_callbook/call_log');
+      await ch.invokeMethod('openOverlayPermission');
+    } catch (_) {
+      await openAppSettings();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('مرکز مجوزها')),
+      body: ListView(
+        padding: const EdgeInsets.all(20),
+        children: [
+          Text(
+            'برای شناسایی تماس و پاپ‌آپ، این موارد را یک‌بار تنظیم کنید:',
+            style: Theme.of(context).textTheme.bodyMedium,
+          ),
+          const SizedBox(height: 16),
+          Card(
+            child: Column(
+              children: [
+                ListTile(
+                  leading: const Icon(Icons.phone_in_talk_rounded, color: Color(0xFF22C55E)),
+                  title: const Text('تلفن و گزارش تماس'),
+                  subtitle: const Text('برای تشخیص شماره تماس ورودی'),
+                  trailing: const Icon(Icons.chevron_left),
+                  onTap: () => openAppSettings(),
+                ),
+                const Divider(height: 1),
+                ListTile(
+                  leading: const Icon(Icons.contacts_rounded, color: Color(0xFF3B82F6)),
+                  title: const Text('مخاطبین'),
+                  subtitle: const Text('نمایش نام مخاطب گوشی'),
+                  trailing: const Icon(Icons.chevron_left),
+                  onTap: () => openAppSettings(),
+                ),
+                const Divider(height: 1),
+                ListTile(
+                  leading: const Icon(Icons.notifications_active_rounded, color: Color(0xFFF59E0B)),
+                  title: const Text('اعلان‌ها'),
+                  subtitle: const Text('اعلان تماس و مانیتور فعال'),
+                  trailing: const Icon(Icons.chevron_left),
+                  onTap: () => openAppSettings(),
+                ),
+                const Divider(height: 1),
+                ListTile(
+                  leading: const Icon(Icons.layers_rounded, color: Color(0xFFFF8C3A)),
+                  title: const Text('پاپ‌آپ روی صفحه'),
+                  subtitle: const Text('نمایش روی صفحه تماس (لازم)'),
+                  trailing: const Icon(Icons.chevron_left),
+                  onTap: _openOverlay,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'هواوی / سامسونگ: در تنظیمات باتری، برای این اپ «بدون محدودیت» و «راه‌اندازی خودکار» را روشن کنید.',
             style: Theme.of(context).textTheme.bodySmall,
           ),
         ],
