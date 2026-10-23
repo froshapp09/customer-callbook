@@ -1,3 +1,4 @@
+import 'package:customer_callbook/shared/widgets/customer_avatar.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:customer_callbook/core/theme/app_colors.dart';
@@ -245,14 +246,7 @@ class _PhonebookPageState extends State<PhonebookPage> {
                                       ),
                                     ),
                                     const SizedBox(width: 12),
-                                    CircleAvatar(
-                                      radius: 24,
-                                      backgroundColor: _avatarColor(c.name),
-                                      child: Text(
-                                        c.name.isNotEmpty ? c.name.characters.first : '?',
-                                        style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18, color: AppColors.textPrimary),
-                                      ),
-                                    ),
+                                    CustomerAvatar(name: c.name, tag: c.tag, favorite: c.favorite, size: 48),
                                   ],
                                 ),
                               ),

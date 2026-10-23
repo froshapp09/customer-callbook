@@ -1,3 +1,4 @@
+import 'package:customer_callbook/shared/widgets/customer_avatar.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:customer_callbook/core/theme/app_colors.dart';
@@ -257,6 +258,8 @@ class _HistoryPageState extends State<HistoryPage> {
                             return _HistoryTile(
                               name: name,
                               phone: r.phone,
+                              tag: customer?.tag,
+                              status: customer?.status,
                               record: r,
                               onCall: () => _dial(r.phone),
                               onOpen: customer == null
@@ -383,6 +386,8 @@ class _DaySection extends StatelessWidget {
 class _HistoryTile extends StatelessWidget {
   final String name;
   final String phone;
+  final String? tag;
+  final String? status;
   final CallRecord record;
   final VoidCallback onCall;
   final VoidCallback? onOpen;
@@ -390,6 +395,8 @@ class _HistoryTile extends StatelessWidget {
   const _HistoryTile({
     required this.name,
     required this.phone,
+    this.tag,
+    this.status,
     required this.record,
     required this.onCall,
     this.onOpen,
@@ -443,6 +450,10 @@ class _HistoryTile extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
                       Text(name, style: Theme.of(context).textTheme.titleMedium, maxLines: 1, overflow: TextOverflow.ellipsis),
+                      if (tag != null && tag!.isNotEmpty) ...[
+                        const SizedBox(height: 4),
+                        TagBadge(tag: tag!, status: status),
+                      ],
                       Text(
                         Customer.displayPhone(phone),
                         style: Theme.of(context).textTheme.bodySmall,
@@ -456,14 +467,7 @@ class _HistoryTile extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 10),
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: _typeColor.withOpacity(0.12),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(_typeIcon, color: _typeColor, size: 18),
-                ),
+                CustomerAvatar(name: name, tag: tag, size: 40),
               ],
             ),
           ),

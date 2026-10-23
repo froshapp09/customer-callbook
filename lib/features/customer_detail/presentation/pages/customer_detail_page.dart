@@ -1,3 +1,4 @@
+import 'package:customer_callbook/shared/widgets/customer_avatar.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -173,14 +174,7 @@ class _CustomerDetailPageState extends State<CustomerDetailPage> {
         padding: const EdgeInsets.fromLTRB(20, 0, 20, 40),
         child: Column(
           children: [
-            CircleAvatar(
-              radius: 44,
-              backgroundColor: _avatarColor(_customer.name),
-              child: Text(
-                _customer.name.isNotEmpty ? _customer.name.characters.first : '?',
-                style: TextStyle(fontSize: 36, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
-              ),
-            ),
+            CustomerAvatar(name: _customer.name, tag: _customer.tag, favorite: _customer.favorite, size: 72),
             const SizedBox(height: 14),
             Row(
               mainAxisAlignment: MainAxisAlignment.center,

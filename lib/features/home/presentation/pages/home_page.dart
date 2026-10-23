@@ -1,3 +1,4 @@
+import 'package:customer_callbook/shared/widgets/customer_avatar.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/material.dart';
 import 'dart:io';
@@ -376,14 +377,7 @@ class _CallsTab extends StatelessWidget {
                               ),
                             ),
                             const SizedBox(width: 10),
-                            CircleAvatar(
-                              radius: 22,
-                              backgroundColor: _avatarColor(c.name).withOpacity(0.25),
-                              child: Text(
-                                c.name.isNotEmpty ? c.name.characters.first : '?',
-                                style: TextStyle(fontWeight: FontWeight.w800, color: _avatarColor(c.name), fontSize: 17),
-                              ),
-                            ),
+                            CustomerAvatar(name: c.name, tag: c.tag, favorite: c.favorite, size: 44),
                             const SizedBox(width: 4),
                             Container(
                               width: 4,

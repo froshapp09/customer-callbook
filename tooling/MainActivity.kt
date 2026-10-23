@@ -1634,47 +1634,49 @@ class DaftarcheWidgetProvider : AppWidgetProvider() {
         }
     }
 
-    override fun onEnabled(context: Context) {
-        // first widget added
-    }
-
     companion object {
-        fun updateOne(context: Context, manager: AppWidgetManager, widgetId: Int) {
-            val views = RemoteViews(context.packageName, R.layout.daftarche_widget)
-            val prefs = context.getSharedPreferences("HomeWidgetPreferences", Context.MODE_PRIVATE)
-            // home_widget package stores with flutter-style or direct keys
-            val count = prefs.getString("widget_count", null)
-                ?: context.getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
-                    .getString("flutter.widget_count", "0")
-                ?: "0"
-            val line1 = prefs.getString("widget_line1", null)
-                ?: context.getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
-                    .getString("flutter.widget_line1", "تماس امروزی ثبت نشده")
-                ?: "تماس امروزی ثبت نشده"
-            val line2 = prefs.getString("widget_line2", null)
-                ?: context.getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
-                    .getString("flutter.widget_line2", "")
-                ?: ""
-            val line3 = prefs.getString("widget_line3", null)
-                ?: context.getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
-                    .getString("flutter.widget_line3", "")
-                ?: ""
+        private fun rid(context: Context, name: String, type: String): Int {
+            return context.resources.getIdentifier(name, type, context.packageName)
+        }
 
-            views.setTextViewText(R.id.widget_count, count)
-            views.setTextViewText(R.id.widget_line1, line1)
-            views.setTextViewText(R.id.widget_line2, line2)
-            views.setTextViewText(R.id.widget_line3, line3)
+        fun updateOne(context: Context, manager: AppWidgetManager, widgetId: Int) {
+            val layoutId = rid(context, "daftarche_widget", "layout")
+            if (layoutId == 0) return
+            val views = RemoteViews(context.packageName, layoutId)
+
+            val prefs = context.getSharedPreferences("HomeWidgetPreferences", Context.MODE_PRIVATE)
+            val flutterPrefs = context.getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
+            fun data(key: String, fallback: String): String {
+                return prefs.getString(key, null)
+                    ?: flutterPrefs.getString("flutter.$key", null)
+                    ?: fallback
+            }
+
+            val count = data("widget_count", "0")
+            val line1 = data("widget_line1", "تماس امروزی ثبت نشده")
+            val line2 = data("widget_line2", "")
+            val line3 = data("widget_line3", "")
+
+            val idCount = rid(context, "widget_count", "id")
+            val id1 = rid(context, "widget_line1", "id")
+            val id2 = rid(context, "widget_line2", "id")
+            val id3 = rid(context, "widget_line3", "id")
+            val idRoot = rid(context, "widget_root", "id")
+
+            if (idCount != 0) views.setTextViewText(idCount, count)
+            if (id1 != 0) views.setTextViewText(id1, line1)
+            if (id2 != 0) views.setTextViewText(id2, line2)
+            if (id3 != 0) views.setTextViewText(id3, line3)
 
             val launch = context.packageManager.getLaunchIntentForPackage(context.packageName)
-            if (launch != null) {
+            if (launch != null && idRoot != 0) {
                 val pi = PendingIntent.getActivity(
                     context, 0, launch,
                     PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
                 )
-                views.setOnClickPendingIntent(R.id.widget_root, pi)
+                views.setOnClickPendingIntent(idRoot, pi)
             }
             manager.updateAppWidget(widgetId, views)
         }
     }
 }
-
