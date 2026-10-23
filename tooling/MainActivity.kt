@@ -472,17 +472,78 @@ class CallMonitorService : Service() {
         val c = findCustomer(number)
         if (c != null) {
             CallOverlayService.show(this, number, c.first, c.third, CallOverlayService.MODE_RING)
+            // شماره در دفترچه — pending ذخیره نگذار
         } else {
-            CallOverlayService.show(this, number, null, null, CallOverlayService.MODE_RING)
+            val contactName = lookupContactName(number)
+            if (contactName != null) {
+                // مخاطب گوشی — فقط نام نشان بده، بعداً پیشنهاد ذخیره نده
+                CallOverlayService.show(this, number, contactName, "مخاطب گوشی", CallOverlayService.MODE_RING)
+            } else {
+                CallOverlayService.show(this, number, null, null, CallOverlayService.MODE_RING)
+                savePending(number, "ringing")
+            }
         }
-        savePending(number, "ringing")
+    }
+
+    private fun lookupContactName(phone: String): String? {
+        return try {
+            val key = matchKey(phone)
+            if (key.isEmpty()) return null
+            val uri = android.provider.ContactsContract.CommonDataKinds.Phone.CONTENT_URI
+            contentResolver.query(
+                uri,
+                arrayOf(
+                    android.provider.ContactsContract.CommonDataKinds.Phone.NUMBER,
+                    android.provider.ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME
+                ),
+                null, null, null
+            )?.use { cursor ->
+                val idxN = cursor.getColumnIndex(android.provider.ContactsContract.CommonDataKinds.Phone.NUMBER)
+                val idxName = cursor.getColumnIndex(android.provider.ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME)
+                if (idxN < 0) return null
+                while (cursor.moveToNext()) {
+                    val n = cursor.getString(idxN) ?: continue
+                    if (matchKey(n) == key) {
+                        val name = if (idxName >= 0) cursor.getString(idxName) else null
+                        if (!name.isNullOrBlank()) return name
+                    }
+                }
+            }
+            null
+        } catch (_: Exception) {
+            null
+        }
     }
 
     private fun onCallEnded(number: String) {
         val c = findCustomer(number)
-        if (c == null) {
-            savePending(number, "save")
-            CallOverlayService.show(this, number, null, null, CallOverlayService.MODE_SAVE)
+        if (c != null) return // قبلاً در دفترچه اپ
+        // اگر در مخاطبین گوشی هست، پیشنهاد ذخیره نده
+        if (isInDeviceContacts(number)) return
+        savePending(number, "save")
+        CallOverlayService.show(this, number, null, null, CallOverlayService.MODE_SAVE)
+    }
+
+    private fun isInDeviceContacts(phone: String): Boolean {
+        return try {
+            val key = matchKey(phone)
+            if (key.isEmpty()) return false
+            val uri = android.provider.ContactsContract.CommonDataKinds.Phone.CONTENT_URI
+            contentResolver.query(
+                uri,
+                arrayOf(android.provider.ContactsContract.CommonDataKinds.Phone.NUMBER),
+                null, null, null
+            )?.use { cursor ->
+                val idx = cursor.getColumnIndex(android.provider.ContactsContract.CommonDataKinds.Phone.NUMBER)
+                if (idx < 0) return false
+                while (cursor.moveToNext()) {
+                    val n = cursor.getString(idx) ?: continue
+                    if (matchKey(n) == key) return true
+                }
+            }
+            false
+        } catch (_: Exception) {
+            false
         }
     }
 
@@ -1277,7 +1338,11 @@ class PhoneStateReceiver : BroadcastReceiver() {
                 lastNumber = null
 
                 val c = findCustomer(context, n)
-                if (c == null) {
+                if (c != null) {
+                    // در دفترچه اپ
+                } else if (isInDeviceContacts(context, n)) {
+                    // مخاطب گوشی — پیشنهاد ذخیره نده
+                } else {
                     savePending(context, n, MODE_SAVE)
                     openAlert(context, n, null, null, MODE_SAVE)
                 }
@@ -1501,6 +1566,29 @@ class PhoneStateReceiver : BroadcastReceiver() {
         return if (p.length == 11 && p.startsWith("09")) {
             p.substring(0, 4) + " " + p.substring(4, 7) + " " + p.substring(7)
         } else p
+    }
+
+    private fun isInDeviceContacts(context: Context, phone: String): Boolean {
+        return try {
+            val key = matchKey(phone)
+            if (key.isEmpty()) return false
+            val uri = android.provider.ContactsContract.CommonDataKinds.Phone.CONTENT_URI
+            context.contentResolver.query(
+                uri,
+                arrayOf(android.provider.ContactsContract.CommonDataKinds.Phone.NUMBER),
+                null, null, null
+            )?.use { cursor ->
+                val idx = cursor.getColumnIndex(android.provider.ContactsContract.CommonDataKinds.Phone.NUMBER)
+                if (idx < 0) return false
+                while (cursor.moveToNext()) {
+                    val n = cursor.getString(idx) ?: continue
+                    if (matchKey(n) == key) return true
+                }
+            }
+            false
+        } catch (_: Exception) {
+            false
+        }
     }
 
     companion object {
