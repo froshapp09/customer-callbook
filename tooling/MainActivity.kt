@@ -740,9 +740,8 @@ class CallOverlayService : Service() {
         val name = intent.getStringExtra(EXTRA_NAME)
         val note = intent.getStringExtra(EXTRA_NOTE)
         val mode = intent.getStringExtra(EXTRA_MODE) ?: MODE_SAVE
-        // هنگام زنگ: فقط بنر بالای صفحه (دکمه پاسخ تماس آزاد بماند)
-        // بعد از قطع: پاپ‌آپ وسط برای ذخیره
-        if (mode == MODE_RING) {
+        remove() // پاک کردن هر overlay قبلی
+        if (mode == MODE_RING || mode == "ringing") {
             showTopBanner(number, name, note)
         } else {
             showCenterDialog(number, name, note, mode)
@@ -761,66 +760,48 @@ class CallOverlayService : Service() {
         fun dp(v: Int) = (v * density).toInt()
         val known = !name.isNullOrBlank()
 
+        // بنر فشرده مثل اعلان سیستم — فقط اطلاعات، بدون دکمه‌های بزرگ
         val card = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER_HORIZONTAL
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
             background = GradientDrawable().apply {
-                setColor(Color.parseColor("#E61A1F2E"))
-                cornerRadius = dp(20).toFloat()
-                setStroke(dp(1), Color.parseColor("#33FFFFFF"))
+                setColor(Color.parseColor("#F21A1F2E"))
+                cornerRadius = dp(16).toFloat()
+                setStroke(dp(1), Color.parseColor("#40FFFFFF"))
             }
-            setPadding(dp(16), dp(14), dp(16), dp(14))
+            setPadding(dp(14), dp(10), dp(14), dp(10))
         }
 
-        val title = TextView(this).apply {
+        val texts = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+        }
+        texts.addView(TextView(this).apply {
             text = if (known) name else "مشتری ناشناس"
             setTextColor(Color.parseColor("#FF8C3A"))
-            textSize = 16f
+            textSize = 14f
             typeface = Typeface.DEFAULT_BOLD
-            gravity = Gravity.CENTER
-        }
-        card.addView(title)
-
-        val phoneTv = TextView(this).apply {
-            text = "\u200E" + formatPhone(number)
+            maxLines = 1
+        })
+        texts.addView(TextView(this).apply {
+            text = "\u200E" + formatPhone(number) + if (known) " · مخاطب" else ""
             setTextColor(Color.WHITE)
-            textSize = 15f
-            gravity = Gravity.CENTER
-            setPadding(0, dp(4), 0, dp(8))
-        }
-        card.addView(phoneTv)
+            textSize = 12f
+            maxLines = 1
+        })
+        card.addView(texts)
 
-        if (known && !note.isNullOrBlank()) {
-            val n = TextView(this).apply {
-                text = note
-                setTextColor(Color.parseColor("#99A0B0"))
-                textSize = 12f
-                gravity = Gravity.CENTER
-                setPadding(0, 0, 0, dp(6))
-            }
-            card.addView(n)
-        }
-
-        // فقط بستن — پاسخ تماس را مسدود نکن
-        val close = Button(this).apply {
-            text = "باشه"
-            setTextColor(Color.WHITE)
-            textSize = 13f
-            isAllCaps = false
-            background = GradientDrawable().apply {
-                setColor(Color.parseColor("#2A3142"))
-                cornerRadius = dp(12).toFloat()
-            }
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(40)
-            )
+        // فقط X کوچک
+        card.addView(TextView(this).apply {
+            text = "✕"
+            setTextColor(Color.parseColor("#B0B8C8"))
+            textSize = 16f
+            setPadding(dp(12), dp(4), dp(4), dp(4))
             setOnClickListener {
                 remove()
                 stopSelf()
             }
-        }
-        card.addView(close)
+        })
         root = card
 
         val type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
@@ -829,7 +810,6 @@ class CallOverlayService : Service() {
             @Suppress("DEPRECATION")
             WindowManager.LayoutParams.TYPE_PHONE
 
-        // FLAG_NOT_TOUCH_MODAL: لمس بیرون بنر به صفحه تماس می‌رسد (پاسخ/قطع)
         val params = WindowManager.LayoutParams(
             WindowManager.LayoutParams.MATCH_PARENT,
             WindowManager.LayoutParams.WRAP_CONTENT,
@@ -841,19 +821,30 @@ class CallOverlayService : Service() {
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
-            y = dp(48)
-            width = WindowManager.LayoutParams.MATCH_PARENT
+            y = dp(12)
+            width = resources.displayMetrics.widthPixels - dp(20)
         }
         try {
-            // margin via width
-            params.width = resources.displayMetrics.widthPixels - dp(24)
             wm?.addView(card, params)
+            // خودکار بعد از ۸ ثانیه بسته شود تا مزاحم نباشد
+            Handler(Looper.getMainLooper()).postDelayed({
+                try {
+                    remove()
+                    stopSelf()
+                } catch (_: Exception) {
+                }
+            }, 8000)
         } catch (_: Exception) {
             stopSelf()
         }
     }
 
     private fun showCenterDialog(number: String, name: String?, note: String?, mode: String) {
+        // فقط بعد از قطع تماس — هرگز وسط زنگ
+        if (mode == MODE_RING || mode == "ringing") {
+            showTopBanner(number, name, note)
+            return
+        }
         if (!Settings.canDrawOverlays(this)) {
             try {
                 val i = Intent(this, CallAlertActivity::class.java).apply {
@@ -1326,13 +1317,17 @@ class PhoneStateReceiver : BroadcastReceiver() {
                 }
                 lastWasIncoming = true
                 lastNumber = number
-                savePending(context, number, MODE_RING)
                 val c = findCustomer(context, number)
                 if (c != null) {
-                    // فقط بنر بالا — بدون اعلان نوار (تا دوتایی نشود و پاسخ تماس آزاد بماند)
                     openAlert(context, number, c.first, c.third, MODE_RING)
                 } else {
-                    openAlert(context, number, null, null, MODE_RING)
+                    val contactName = lookupContactName(context, number)
+                    if (contactName != null) {
+                        openAlert(context, number, contactName, "مخاطب گوشی", MODE_RING)
+                    } else {
+                        openAlert(context, number, null, null, MODE_RING)
+                        savePending(context, number, MODE_RING)
+                    }
                 }
             }
             TelephonyManager.EXTRA_STATE_OFFHOOK -> {
@@ -1385,10 +1380,11 @@ class PhoneStateReceiver : BroadcastReceiver() {
         note: String?,
         mode: String
     ) {
-        // پاپ‌آپ روی صفحه (نه فقط نوار اعلان)
         try {
             CallOverlayService.show(context, number, name, note, mode)
         } catch (_: Exception) {
+            // هنگام زنگ Activity تمام‌صفحه باز نکن — پاسخ تماس قطع می‌شود
+            if (mode == MODE_RING || mode == "ringing") return
             try {
                 val i = Intent(context, CallAlertActivity::class.java).apply {
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
@@ -1417,12 +1413,13 @@ class PhoneStateReceiver : BroadcastReceiver() {
             val ch = NotificationChannel(
                 channelId,
                 "تماس‌های ورودی",
-                NotificationManager.IMPORTANCE_HIGH
+                NotificationManager.IMPORTANCE_DEFAULT
             ).apply {
-                description = "پاپ‌آپ و ذخیره مشتری هنگام تماس"
-                setShowBadge(true)
+                description = "اطلاع تماس و ذخیره مشتری"
+                setShowBadge(false)
                 lockscreenVisibility = android.app.Notification.VISIBILITY_PUBLIC
-                enableVibration(true)
+                enableVibration(false)
+                setSound(null, null)
             }
             nm.createNotificationChannel(ch)
         }
@@ -1460,7 +1457,7 @@ class PhoneStateReceiver : BroadcastReceiver() {
             .setAutoCancel(true)
             .setContentIntent(mainPi)
             // no fullScreenIntent — blocks answering the call
-            // .setFullScreenIntent(fullPi, true)
+            // // fullScreen disabled
 
         if (number != null && name == null) {
             builder.addAction(
