@@ -1582,6 +1582,36 @@ class PhoneStateReceiver : BroadcastReceiver() {
         } else p
     }
 
+    private fun lookupContactName(context: Context, phone: String): String? {
+        return try {
+            val key = matchKey(phone)
+            if (key.isEmpty()) return null
+            val uri = android.provider.ContactsContract.CommonDataKinds.Phone.CONTENT_URI
+            context.contentResolver.query(
+                uri,
+                arrayOf(
+                    android.provider.ContactsContract.CommonDataKinds.Phone.NUMBER,
+                    android.provider.ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME
+                ),
+                null, null, null
+            )?.use { cursor ->
+                val idxN = cursor.getColumnIndex(android.provider.ContactsContract.CommonDataKinds.Phone.NUMBER)
+                val idxName = cursor.getColumnIndex(android.provider.ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME)
+                if (idxN < 0) return null
+                while (cursor.moveToNext()) {
+                    val n = cursor.getString(idxN) ?: continue
+                    if (matchKey(n) == key) {
+                        val name = if (idxName >= 0) cursor.getString(idxName) else null
+                        if (!name.isNullOrBlank()) return name
+                    }
+                }
+            }
+            null
+        } catch (_: Exception) {
+            null
+        }
+    }
+
     private fun isInDeviceContacts(context: Context, phone: String): Boolean {
         return try {
             val key = matchKey(phone)
