@@ -1,3 +1,4 @@
+import 'package:customer_callbook/features/reminders/presentation/pages/reminders_page.dart';
 import 'package:customer_callbook/shared/widgets/customer_avatar.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/material.dart';
@@ -24,7 +25,6 @@ import 'package:customer_callbook/data/services/note_templates_service.dart';
 import 'package:customer_callbook/data/services/backup_service.dart';
 import 'package:customer_callbook/features/report/presentation/pages/weekly_report_page.dart';
 import 'package:customer_callbook/services/widget_service.dart';
-import 'package:customer_callbook/services/widget_service.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -42,7 +42,7 @@ class _HomePageState extends State<HomePage> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _checkPendingAdd());
+    WidgetsBinding.instance.addPostFrameCallback((_) async { await _checkPendingStatus(); await _checkPendingAdd(); });
     _load();
   }
 
@@ -122,6 +122,29 @@ class _HomePageState extends State<HomePage> {
     } catch (_) {
       await openAppSettings();
     }
+  }
+
+
+  Future<void> _checkPendingStatus() async {
+    try {
+      final p = await SharedPreferences.getInstance();
+      final phone = p.getString('pending_status_phone') ?? p.getString('flutter.pending_status_phone');
+      final status = p.getString('pending_status_value') ?? p.getString('flutter.pending_status_value');
+      await p.remove('pending_status_phone');
+      await p.remove('pending_status_value');
+      await p.remove('flutter.pending_status_phone');
+      await p.remove('flutter.pending_status_value');
+      if (phone == null || status == null || phone.isEmpty) return;
+      final c = await _service.findByPhone(phone);
+      if (c == null) return;
+      await _service.update(c.copyWith(status: status));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('وضعیت «${c.name}» → $status')),
+        );
+        _load();
+      }
+    } catch (_) {}
   }
 
   Future<void> _checkPendingAdd() async {
@@ -577,6 +600,9 @@ class _SettingsTab extends StatelessWidget {
         const SizedBox(height: 10),
         _tile(context, Icons.sticky_note_2_rounded, const Color(0xFF38BDF8), 'یادداشت‌های آماده', 'انتخاب سریع هنگام ذخیره مشتری', () {
           Navigator.push(context, MaterialPageRoute(builder: (_) => const _NoteTemplatesPage()));
+        }),
+        _tile(context, Icons.event_note_rounded, const Color(0xFFEF4444), 'امروز زنگ بزن', 'یادآوری‌های امروز و عقب‌افتاده', () {
+          Navigator.push(context, MaterialPageRoute(builder: (_) => const RemindersPage()));
         }),
         _tile(context, Icons.insights_rounded, const Color(0xFF8B5CF6), 'گزارش هفتگی', 'تماس، مشتری جدید، وضعیت فروش', () {
           Navigator.push(context, MaterialPageRoute(builder: (_) => const WeeklyReportPage()));

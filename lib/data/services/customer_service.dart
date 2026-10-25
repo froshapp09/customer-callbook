@@ -145,11 +145,30 @@ class CustomerService {
     final all = await getAll();
     if (q.trim().isEmpty) return all;
     final lower = q.trim().toLowerCase();
+    final nq = Customer.normalizePhone(q);
     return all.where((c) {
       return c.name.toLowerCase().contains(lower) ||
           c.phone.contains(lower) ||
-          Customer.normalizePhone(c.phone).contains(Customer.normalizePhone(q));
+          Customer.normalizePhone(c.phone).contains(nq) ||
+          (c.note ?? '').toLowerCase().contains(lower) ||
+          (c.city ?? '').toLowerCase().contains(lower) ||
+          c.tag.contains(lower) ||
+          c.status.contains(lower);
     }).toList();
+  }
+
+  /// یادآوری‌های امروز و عقب‌افتاده
+  Future<List<Customer>> remindersDueToday() async {
+    final all = await getAll();
+    final now = DateTime.now();
+    final end = DateTime(now.year, now.month, now.day).add(const Duration(days: 1));
+    final list = all.where((c) {
+      final r = c.reminderAt;
+      if (r == null) return false;
+      return r.isBefore(end);
+    }).toList();
+    list.sort((a, b) => a.reminderAt!.compareTo(b.reminderAt!));
+    return list;
   }
 
   static const _callsKey = 'call_records_v1';

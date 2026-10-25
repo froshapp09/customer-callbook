@@ -1,3 +1,4 @@
+import 'package:flutter/services.dart';
 import 'package:customer_callbook/shared/widgets/customer_avatar.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -198,6 +199,14 @@ class _PhonebookPageState extends State<PhonebookPage> {
                                 );
                                 _load();
                                 widget.onChanged?.call();
+                              },
+                              onLongPress: () async {
+                                await Clipboard.setData(ClipboardData(text: Customer.normalizePhone(c.phone)));
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(content: Text('شماره کپی شد'), duration: Duration(seconds: 1)),
+                                  );
+                                }
                               },
                               child: Padding(
                                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),

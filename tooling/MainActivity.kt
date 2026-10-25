@@ -534,8 +534,11 @@ class CallMonitorService : Service() {
 
     private fun onCallEnded(number: String) {
         val c = findCustomer(number)
-        if (c != null) return // قبلاً در دفترچه اپ
-        // اگر در مخاطبین گوشی هست، پیشنهاد ذخیره نده
+        if (c != null) {
+            // مشتری موجود — ثبت سریع نتیجه تماس
+            CallOverlayService.show(this, number, c.first, c.third, CallOverlayService.MODE_RESULT)
+            return
+        }
         if (isInDeviceContacts(number)) return
         savePending(number, "save")
         CallOverlayService.show(this, number, null, null, CallOverlayService.MODE_SAVE)
@@ -741,10 +744,10 @@ class CallOverlayService : Service() {
         val note = intent.getStringExtra(EXTRA_NOTE)
         val mode = intent.getStringExtra(EXTRA_MODE) ?: MODE_SAVE
         remove() // پاک کردن هر overlay قبلی
-        if (mode == MODE_RING || mode == "ringing") {
-            showTopBanner(number, name, note)
-        } else {
-            showCenterDialog(number, name, note, mode)
+        when {
+            mode == MODE_RING || mode == "ringing" -> showTopBanner(number, name, note)
+            mode == MODE_RESULT || mode == "result" -> showResultDialog(number, name, note)
+            else -> showCenterDialog(number, name, note, mode)
         }
         return START_NOT_STICKY
     }
@@ -834,6 +837,96 @@ class CallOverlayService : Service() {
                 } catch (_: Exception) {
                 }
             }, 8000)
+        } catch (_: Exception) {
+            stopSelf()
+        }
+    }
+
+
+    private fun showResultDialog(number: String, name: String?, note: String?) {
+        if (!Settings.canDrawOverlays(this)) {
+            stopSelf()
+            return
+        }
+        remove()
+        wm = getSystemService(WINDOW_SERVICE) as WindowManager
+        val density = resources.displayMetrics.density
+        fun dp(v: Int) = (v * density).toInt()
+
+        val container = FrameLayout(this).apply {
+            setBackgroundColor(Color.parseColor("#44000A12"))
+            isClickable = true
+        }
+        val card = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER_HORIZONTAL
+            background = GradientDrawable().apply {
+                setColor(Color.parseColor("#1A1F2E"))
+                cornerRadius = dp(24).toFloat()
+            }
+            setPadding(dp(20), dp(20), dp(20), dp(16))
+            layoutParams = FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                gravity = Gravity.CENTER
+                marginStart = dp(20)
+                marginEnd = dp(20)
+            }
+        }
+        card.addView(TextView(this).apply {
+            text = name ?: "مشتری"
+            setTextColor(Color.parseColor("#FF8C3A"))
+            textSize = 18f
+            typeface = Typeface.DEFAULT_BOLD
+            gravity = Gravity.CENTER
+        })
+        card.addView(TextView(this).apply {
+            text = "نتیجه این تماس؟"
+            setTextColor(Color.parseColor("#99A0B0"))
+            textSize = 13f
+            gravity = Gravity.CENTER
+            setPadding(0, dp(6), 0, dp(14))
+        })
+        fun statusBtn(label: String, status: String, color: Int) {
+            card.addView(makeBtn(label, color) {
+                try {
+                    getSharedPreferences("FlutterSharedPreferences", MODE_PRIVATE).edit()
+                        .putString("flutter.pending_status_phone", number)
+                        .putString("flutter.pending_status_value", status)
+                        .apply()
+                } catch (_: Exception) {}
+                val i = Intent(this, MainActivity::class.java).apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                }
+                startActivity(i)
+                remove()
+                stopSelf()
+            })
+        }
+        statusBtn("بی‌پاسخ", "بی‌پاسخ", Color.parseColor("#DC2626"))
+        statusBtn("در حال مذاکره", "در حال مذاکره", Color.parseColor("#D97706"))
+        statusBtn("خرید کرده", "خرید کرده", Color.parseColor("#16A34A"))
+        card.addView(makeBtn("نادیده گرفتن", Color.parseColor("#2A3142"), Color.parseColor("#B0B8C8")) {
+            remove()
+            stopSelf()
+        })
+        container.addView(card)
+        root = container
+        val type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+        else
+            @Suppress("DEPRECATION")
+            WindowManager.LayoutParams.TYPE_PHONE
+        val params = WindowManager.LayoutParams(
+            WindowManager.LayoutParams.MATCH_PARENT,
+            WindowManager.LayoutParams.MATCH_PARENT,
+            type,
+            WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED,
+            PixelFormat.TRANSLUCENT
+        )
+        try {
+            wm?.addView(container, params)
         } catch (_: Exception) {
             stopSelf()
         }
@@ -1057,6 +1150,7 @@ class CallOverlayService : Service() {
         const val EXTRA_MODE = "mode"
         const val MODE_RING = "ringing"
         const val MODE_SAVE = "save"
+        const val MODE_RESULT = "result"
         const val ACTION_DISMISS = "ir.apadanasleep.customer_callbook.DISMISS_OVERLAY"
 
         fun show(
@@ -1351,9 +1445,9 @@ class PhoneStateReceiver : BroadcastReceiver() {
 
                 val c = findCustomer(context, n)
                 if (c != null) {
-                    // در دفترچه اپ
+                    openAlert(context, n, c.first, c.third, "result")
                 } else if (isInDeviceContacts(context, n)) {
-                    // مخاطب گوشی — پیشنهاد ذخیره نده
+                    // مخاطب گوشی
                 } else {
                     savePending(context, n, MODE_SAVE)
                     openAlert(context, n, null, null, MODE_SAVE)
