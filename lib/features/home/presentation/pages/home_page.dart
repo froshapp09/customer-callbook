@@ -48,9 +48,7 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _load() async {
     setState(() => _loading = true);
-    try {
-      await _autoImportRecent();
-    } catch (_) {}
+    // تماس‌های گوشی را خودکار وارد سابقه نکن — فقط تماس واقعی/از داخل اپ
     final list = await _service.getAll();
     WidgetService.instance.update();
     if (mounted) {
