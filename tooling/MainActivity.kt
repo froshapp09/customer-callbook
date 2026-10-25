@@ -185,9 +185,11 @@ class MainActivity : FlutterActivity() {
                             result.error("ERROR", e.message, null)
                         }
                     }
-                    "saveBackupFile" -> {
+                    "saveBackupFile", "saveToDownloads" -> {
                         try {
-                            val name = call.argument<String>("name") ?: "backup.json"
+                            val name = call.argument<String>("name")
+                                ?: call.argument<String>("fileName")
+                                ?: "daftarche_backup.json"
                             val content = call.argument<String>("content") ?: ""
                             val path = saveBackup(name, content)
                             result.success(path)
@@ -316,22 +318,42 @@ class MainActivity : FlutterActivity() {
     }
 
     private fun saveBackup(fileName: String, content: String): String {
+        val safeName = fileName.replace(Regex("[\\/]+"), "_")
         val bytes = content.toByteArray(Charsets.UTF_8)
+        val mime = when {
+            safeName.endsWith(".csv", true) -> "text/csv"
+            safeName.endsWith(".txt", true) -> "text/plain"
+            else -> "application/json"
+        }
+        val relative = Environment.DIRECTORY_DOWNLOADS + "/Daftarche"
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            // حذف نسخه قبلی هم‌نام در MediaStore (اختیاری)
+            try {
+                contentResolver.delete(
+                    MediaStore.Downloads.EXTERNAL_CONTENT_URI,
+                    MediaStore.MediaColumns.DISPLAY_NAME + "=?",
+                    arrayOf(safeName)
+                )
+            } catch (_: Exception) {}
             val values = ContentValues().apply {
-                put(MediaStore.MediaColumns.DISPLAY_NAME, fileName)
-                put(MediaStore.MediaColumns.MIME_TYPE, "application/json")
-                put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS)
+                put(MediaStore.MediaColumns.DISPLAY_NAME, safeName)
+                put(MediaStore.MediaColumns.MIME_TYPE, mime)
+                put(MediaStore.MediaColumns.RELATIVE_PATH, relative)
+                put(MediaStore.MediaColumns.IS_PENDING, 1)
             }
             val uri = contentResolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
-                ?: throw Exception("cannot create MediaStore entry")
+                ?: throw Exception("ساخت فایل در دانلود ممکن نشد")
             contentResolver.openOutputStream(uri)?.use { it.write(bytes) }
-                ?: throw Exception("cannot open output stream")
-            return "Downloads/$fileName"
+                ?: throw Exception("نوشتن فایل ممکن نشد")
+            values.clear()
+            values.put(MediaStore.MediaColumns.IS_PENDING, 0)
+            contentResolver.update(uri, values, null, null)
+            return "Download/Daftarche/$safeName"
         }
-        val dir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+        val base = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+        val dir = File(base, "Daftarche")
         if (!dir.exists()) dir.mkdirs()
-        val file = File(dir, fileName)
+        val file = File(dir, safeName)
         FileOutputStream(file).use { it.write(bytes) }
         return file.absolutePath
     }

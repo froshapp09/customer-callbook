@@ -966,10 +966,18 @@ class _BackupPageState extends State<_BackupPage> {
     try {
       final json = await BackupService.instance.exportJson();
       const channel = MethodChannel('ir.apadanasleep.customer_callbook/call_log');
-      final path = await channel.invokeMethod<String>('saveToDownloads', {
-        'content': json,
-        'fileName': 'daftarche_backup.json',
-      });
+      String? path;
+      try {
+        path = await channel.invokeMethod<String>('saveToDownloads', {
+          'content': json,
+          'fileName': 'daftarche_backup.json',
+        });
+      } catch (_) {
+        path = await channel.invokeMethod<String>('saveBackupFile', {
+          'content': json,
+          'name': 'daftarche_backup.json',
+        });
+      }
       if (mounted) {
         setState(() => _msg =
             '✓ ذخیره مستقیم انجام شد\n'

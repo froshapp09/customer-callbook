@@ -52,11 +52,21 @@ class CustomerService {
     final idx = all.indexWhere((e) => Customer.samePhone(e.phone, norm));
     if (idx >= 0) {
       final existing = all[idx];
-      final updated = existing.copyWith(
+      final updated = Customer(
+        id: existing.id,
         name: c.name.isNotEmpty && c.name != c.phone ? c.name : existing.name,
+        phone: existing.phone,
+        note: (c.note != null && c.note!.isNotEmpty) ? c.note : existing.note,
+        tag: c.tag.isNotEmpty ? c.tag : existing.tag,
+        status: c.status.isNotEmpty ? c.status : existing.status,
+        city: c.city ?? existing.city,
+        orderAmount: c.orderAmount ?? existing.orderAmount,
+        reminderAt: c.reminderAt ?? existing.reminderAt,
+        favorite: c.favorite || existing.favorite,
         callCount: existing.callCount + (c.callCount > 0 ? c.callCount : 0),
-        lastCallAt: c.lastCallAt ?? existing.lastCallAt,
         firstCallAt: existing.firstCallAt ?? c.firstCallAt,
+        lastCallAt: c.lastCallAt ?? existing.lastCallAt,
+        createdAt: existing.createdAt,
       );
       all[idx] = updated;
       await _save(all);

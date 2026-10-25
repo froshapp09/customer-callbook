@@ -24,10 +24,11 @@ class BackupService {
 
   Future<String> exportCsv() async {
     final list = await _customers.getAll();
-    final buf = StringBuffer('name,phone,tag,note,callCount,favorite\n');
+    final buf = StringBuffer('name,phone,tag,status,city,note,callCount,favorite,orderAmount\n');
     for (final c in list) {
       final note = (c.note ?? '').replaceAll('"', '""').replaceAll('\n', ' ');
-      buf.writeln('"${c.name}","${c.phone}","${c.tag}","$note",${c.callCount},${c.favorite}');
+      final city = (c.city ?? '').replaceAll('"', '""');
+      buf.writeln('"${c.name}","${c.phone}","${c.tag}","${c.status}","$city","$note",${c.callCount},${c.favorite},${c.orderAmount ?? ''}');
     }
     return buf.toString();
   }
@@ -46,11 +47,21 @@ class BackupService {
       if (existing == null) {
         await _customers.add(c);
       } else {
-        await _customers.update(existing.copyWith(
-          name: c.name,
-          note: c.note,
+        await _customers.update(Customer(
+          id: existing.id,
+          name: c.name.isNotEmpty ? c.name : existing.name,
+          phone: existing.phone,
+          note: c.note ?? existing.note,
           tag: c.tag,
+          status: c.status,
+          city: c.city ?? existing.city,
+          orderAmount: c.orderAmount ?? existing.orderAmount,
+          reminderAt: c.reminderAt ?? existing.reminderAt,
           favorite: c.favorite,
+          callCount: existing.callCount > c.callCount ? existing.callCount : c.callCount,
+          firstCallAt: existing.firstCallAt ?? c.firstCallAt,
+          lastCallAt: existing.lastCallAt ?? c.lastCallAt,
+          createdAt: existing.createdAt,
         ));
       }
       n++;
