@@ -383,26 +383,55 @@ class _CustomerDetailPageState extends State<CustomerDetailPage> {
               spacing: 8,
               runSpacing: 8,
               children: [
-                ('فردا', 1),
-                ('۳ روز بعد', 3),
-                ('یک هفته', 7),
-              ].map((e) {
-                return ActionChip(
-                  avatar: const Icon(Icons.alarm, size: 16),
-                  label: Text(e.$1),
+                _remChip('۱ ساعت', () => DateTime.now().add(const Duration(hours: 1))),
+                _remChip('۳ ساعت', () => DateTime.now().add(const Duration(hours: 3))),
+                _remChip('امروز عصر', () {
+                  final n = DateTime.now();
+                  var t = DateTime(n.year, n.month, n.day, 18, 0);
+                  if (!t.isAfter(n)) t = n.add(const Duration(hours: 2));
+                  return t;
+                }),
+                _remChip('فردا', () {
+                  final n = DateTime.now();
+                  return DateTime(n.year, n.month, n.day + 1, 10, 0);
+                }),
+                _remChip('۳ روز بعد', () {
+                  final n = DateTime.now();
+                  return DateTime(n.year, n.month, n.day + 3, 10, 0);
+                }),
+                _remChip('یک هفته', () {
+                  final n = DateTime.now();
+                  return DateTime(n.year, n.month, n.day + 7, 10, 0);
+                }),
+                ActionChip(
+                  avatar: const Icon(Icons.edit_calendar, size: 16),
+                  label: const Text('انتخاب تاریخ و ساعت'),
                   onPressed: () async {
-                    final when = DateTime.now().add(Duration(days: e.$2));
+                    final n = DateTime.now();
+                    final d = await showDatePicker(
+                      context: context,
+                      initialDate: n,
+                      firstDate: n,
+                      lastDate: n.add(const Duration(days: 365)),
+                    );
+                    if (d == null || !mounted) return;
+                    final tm = await showTimePicker(
+                      context: context,
+                      initialTime: TimeOfDay.fromDateTime(n.add(const Duration(hours: 1))),
+                    );
+                    if (tm == null || !mounted) return;
+                    final when = DateTime(d.year, d.month, d.day, tm.hour, tm.minute);
                     final u = _customer.copyWith(reminderAt: when);
                     await _service.update(u);
                     setState(() => _customer = u);
                     if (mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('یادآوری برای ${e.$1} تنظیم شد')),
+                        SnackBar(content: Text('یادآوری: ${Jalali.format(when, withTime: true)}')),
                       );
                     }
                   },
-                );
-              }).toList(),
+                ),
+              ],
             ),
             if (_customer.reminderAt != null) ...[
               const SizedBox(height: 8),

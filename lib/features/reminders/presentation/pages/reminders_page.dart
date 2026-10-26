@@ -16,7 +16,8 @@ class RemindersPage extends StatefulWidget {
 
 class _RemindersPageState extends State<RemindersPage> {
   final _service = CustomerService();
-  List<Customer> _list = [];
+  List<Customer> _due = [];
+  List<Customer> _up = [];
   bool _loading = true;
 
   @override
@@ -27,8 +28,9 @@ class _RemindersPageState extends State<RemindersPage> {
 
   Future<void> _load() async {
     setState(() => _loading = true);
-    final list = await _service.remindersDueToday();
-    if (mounted) setState(() { _list = list; _loading = false; });
+    final due = await _service.remindersDueToday();
+    final up = await _service.remindersUpcoming();
+    if (mounted) setState(() { _due = due; _up = up; _loading = false; });
   }
 
   Future<void> _call(Customer c) async {
@@ -53,52 +55,70 @@ class _RemindersPageState extends State<RemindersPage> {
     _load();
   }
 
+  Widget _card(Customer c, {bool overdue = false}) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 10),
+      child: ListTile(
+        leading: CustomerAvatar(name: c.name, tag: c.tag, size: 44),
+        title: Text(c.name),
+        subtitle: Text(
+          '${overdue ? "عقب‌افتاده · " : ""}${Jalali.format(c.reminderAt!, withTime: true)} · ${c.status}',
+        ),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            IconButton(icon: const Icon(Icons.copy_rounded, size: 20), onPressed: () => _copy(c)),
+            IconButton(icon: Icon(Icons.phone_rounded, color: AppColors.accent), onPressed: () => _call(c)),
+            IconButton(icon: const Icon(Icons.check_circle_outline), onPressed: () => _done(c)),
+          ],
+        ),
+        onTap: () async {
+          await Navigator.push(context, MaterialPageRoute(builder: (_) => CustomerDetailPage(customer: c)));
+          _load();
+        },
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final today = DateTime.now();
+    final start = DateTime(today.year, today.month, today.day);
     return Scaffold(
       appBar: AppBar(title: const Text('امروز زنگ بزن')),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
-          : _list.isEmpty
+          : (_due.isEmpty && _up.isEmpty)
               ? Center(
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Icon(Icons.event_available_rounded, size: 48, color: AppColors.textMuted),
                       const SizedBox(height: 12),
-                      Text('یادآوری برای امروز نیست', style: Theme.of(context).textTheme.bodyMedium),
+                      Text('یادآوری‌ای نیست', style: Theme.of(context).textTheme.bodyMedium),
+                      const SizedBox(height: 8),
+                      Text('از صفحه مشتری → یادآوری تماس تنظیم کنید', style: Theme.of(context).textTheme.bodySmall),
                     ],
                   ),
                 )
-              : ListView.builder(
+              : ListView(
                   padding: const EdgeInsets.all(16),
-                  itemCount: _list.length,
-                  itemBuilder: (context, i) {
-                    final c = _list[i];
-                    final overdue = c.reminderAt!.isBefore(DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day));
-                    return Card(
-                      margin: const EdgeInsets.only(bottom: 10),
-                      child: ListTile(
-                        leading: CustomerAvatar(name: c.name, tag: c.tag, size: 44),
-                        title: Text(c.name),
-                        subtitle: Text(
-                          '${overdue ? "عقب‌افتاده · " : ""}${Jalali.format(c.reminderAt!)} · ${c.status}',
-                        ),
-                        trailing: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            IconButton(icon: const Icon(Icons.copy_rounded, size: 20), onPressed: () => _copy(c), tooltip: 'کپی'),
-                            IconButton(icon: Icon(Icons.phone_rounded, color: AppColors.accent), onPressed: () => _call(c)),
-                            IconButton(icon: const Icon(Icons.check_circle_outline), onPressed: () => _done(c), tooltip: 'انجام شد'),
-                          ],
-                        ),
-                        onTap: () async {
-                          await Navigator.push(context, MaterialPageRoute(builder: (_) => CustomerDetailPage(customer: c)));
-                          _load();
-                        },
-                      ),
-                    );
-                  },
+                  children: [
+                    if (_due.isNotEmpty) ...[
+                      Text('امروز و عقب‌افتاده', style: Theme.of(context).textTheme.titleMedium),
+                      const SizedBox(height: 8),
+                      ..._due.map((c) {
+                        final rd = DateTime(c.reminderAt!.year, c.reminderAt!.month, c.reminderAt!.day);
+                        return _card(c, overdue: rd.isBefore(start));
+                      }),
+                    ],
+                    if (_up.isNotEmpty) ...[
+                      const SizedBox(height: 12),
+                      Text('روزهای آینده', style: Theme.of(context).textTheme.titleMedium),
+                      const SizedBox(height: 8),
+                      ..._up.map((c) => _card(c)),
+                    ],
+                  ],
                 ),
     );
   }

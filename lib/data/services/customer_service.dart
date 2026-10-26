@@ -167,15 +167,32 @@ class CustomerService {
     }).toList();
   }
 
-  /// یادآوری‌های امروز و عقب‌افتاده
+  /// یادآوری‌های امروز و عقب‌افتاده (مقایسه روز تقویمی)
   Future<List<Customer>> remindersDueToday() async {
     final all = await getAll();
     final now = DateTime.now();
-    final end = DateTime(now.year, now.month, now.day).add(const Duration(days: 1));
+    final today = DateTime(now.year, now.month, now.day);
     final list = all.where((c) {
       final r = c.reminderAt;
       if (r == null) return false;
-      return r.isBefore(end);
+      final rd = DateTime(r.year, r.month, r.day);
+      return !rd.isAfter(today); // امروز یا قبل
+    }).toList();
+    list.sort((a, b) => a.reminderAt!.compareTo(b.reminderAt!));
+    return list;
+  }
+
+  /// یادآوری‌های ۷ روز آینده (به‌جز امروز که در due است)
+  Future<List<Customer>> remindersUpcoming() async {
+    final all = await getAll();
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final end = today.add(const Duration(days: 8));
+    final list = all.where((c) {
+      final r = c.reminderAt;
+      if (r == null) return false;
+      final rd = DateTime(r.year, r.month, r.day);
+      return rd.isAfter(today) && rd.isBefore(end);
     }).toList();
     list.sort((a, b) => a.reminderAt!.compareTo(b.reminderAt!));
     return list;

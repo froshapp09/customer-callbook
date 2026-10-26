@@ -555,15 +555,41 @@ class CallMonitorService : Service() {
     }
 
     private fun onCallEnded(number: String) {
+        // اعلان‌های موقت تماس را پاک کن
+        try {
+            val nm = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
+            nm.cancel(2010)
+            nm.cancel(2011)
+            nm.cancel(42)
+            for (id in 2000..2020) nm.cancel(id)
+        } catch (_: Exception) {}
+
         val c = findCustomer(number)
         if (c != null) {
-            // مشتری موجود — ثبت سریع نتیجه تماس
-            CallOverlayService.show(this, number, c.first, c.third, CallOverlayService.MODE_RESULT)
+            // فقط مشتری دفترچه اپ — نه مخاطب صرف گوشی
+            if (isResultPopupEnabled()) {
+                CallOverlayService.show(this, number, c.first, c.third, CallOverlayService.MODE_RESULT)
+            }
             return
         }
+        // مخاطب گوشی یا ناشناس بدون دفترچه: نتیجه فروش نشان نده
         if (isInDeviceContacts(number)) return
         savePending(number, "save")
         CallOverlayService.show(this, number, null, null, CallOverlayService.MODE_SAVE)
+    }
+
+    private fun isResultPopupEnabled(): Boolean {
+        return try {
+            val prefs = getSharedPreferences("FlutterSharedPreferences", MODE_PRIVATE)
+            // پیش‌فرض روشن؛ اگر کاربر خاموش کرده false
+            if (prefs.contains("flutter.show_result_popup")) {
+                prefs.getBoolean("flutter.show_result_popup", true)
+            } else {
+                true
+            }
+        } catch (_: Exception) {
+            true
+        }
     }
 
     private fun isInDeviceContacts(phone: String): Boolean {
@@ -1465,11 +1491,19 @@ class PhoneStateReceiver : BroadcastReceiver() {
                 lastWasIncoming = false
                 lastNumber = null
 
+                // پاک کردن اعلان‌های تماس
+                try {
+                    val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+                    for (id in 2000..2020) nm.cancel(id)
+                } catch (_: Exception) {}
                 val c = findCustomer(context, n)
                 if (c != null) {
-                    openAlert(context, n, c.first, c.third, "result")
+                    val prefs = context.getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
+                    val enabled = if (prefs.contains("flutter.show_result_popup"))
+                        prefs.getBoolean("flutter.show_result_popup", true) else true
+                    if (enabled) openAlert(context, n, c.first, c.third, "result")
                 } else if (isInDeviceContacts(context, n)) {
-                    // مخاطب گوشی
+                    // مخاطب گوشی — پاپ‌آپ نتیجه نه
                 } else {
                     savePending(context, n, MODE_SAVE)
                     openAlert(context, n, null, null, MODE_SAVE)

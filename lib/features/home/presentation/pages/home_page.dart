@@ -556,15 +556,44 @@ class _GlowIcon extends StatelessWidget {
   }
 }
 
-class _SettingsTab extends StatelessWidget {
+
+class _SettingsTab extends StatefulWidget {
   final VoidCallback onReload;
   final List<Customer> customers;
   const _SettingsTab({required this.onReload, required this.customers});
 
   @override
+  State<_SettingsTab> createState() => _SettingsTabState();
+}
+
+class _SettingsTabState extends State<_SettingsTab> {
+  bool _resultPopup = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPrefs();
+  }
+
+  Future<void> _loadPrefs() async {
+    final p = await SharedPreferences.getInstance();
+    if (mounted) {
+      setState(() {
+        _resultPopup = p.getBool('show_result_popup') ?? true;
+      });
+    }
+  }
+
+  Future<void> _setResultPopup(bool v) async {
+    final p = await SharedPreferences.getInstance();
+    await p.setBool('show_result_popup', v);
+    setState(() => _resultPopup = v);
+  }
+
+  @override
   Widget build(BuildContext context) {
     return ListView(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
       children: [
         Row(
           children: [
@@ -577,73 +606,181 @@ class _SettingsTab extends StatelessWidget {
                 ],
               ),
             ),
-            _GlowIcon(Icons.settings_rounded, AppColors.primary),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withOpacity(0.12),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Icon(Icons.settings_rounded, color: AppColors.primary, size: 26),
+            ),
           ],
         ),
-        const SizedBox(height: 20),
+        const SizedBox(height: 18),
+
+        // کارت شناسایی
         const _CallDetectTile(),
         const SizedBox(height: 10),
-        _tile(context, Icons.admin_panel_settings_rounded, AppColors.info, 'مرکز مجوزها',
-            'تلفن، مخاطبین، اعلان، پاپ‌آپ روی صفحه', () {
-          Navigator.push(context, MaterialPageRoute(builder: (_) => const _PermissionsHubPage()));
-        }),
-        const SizedBox(height: 10),
-        _tile(context, Icons.phone_android_rounded, AppColors.primary, 'تماس‌های گوشی', 'خواندن تاریخچه و افزودن', () async {
-          await Navigator.push(context, MaterialPageRoute(builder: (_) => const CallSyncPage()));
-          onReload();
-        }),
-        _tile(context, Icons.palette_rounded, AppColors.warning, 'رنگ دسته‌بندی‌ها', 'مشتری، همکار، سایر', () {
-          Navigator.push(context, MaterialPageRoute(builder: (_) => const _TagColorPage()));
-        }),
-        const SizedBox(height: 10),
-        _tile(context, Icons.sticky_note_2_rounded, const Color(0xFF38BDF8), 'یادداشت‌های آماده', 'انتخاب سریع هنگام ذخیره مشتری', () {
-          Navigator.push(context, MaterialPageRoute(builder: (_) => const _NoteTemplatesPage()));
-        }),
-        _tile(context, Icons.event_note_rounded, const Color(0xFFEF4444), 'امروز زنگ بزن', 'یادآوری‌های امروز و عقب‌افتاده', () {
-          Navigator.push(context, MaterialPageRoute(builder: (_) => const RemindersPage()));
-        }),
-        _tile(context, Icons.insights_rounded, const Color(0xFF8B5CF6), 'گزارش هفتگی', 'تماس، مشتری جدید، وضعیت فروش', () {
-          Navigator.push(context, MaterialPageRoute(builder: (_) => const WeeklyReportPage()));
-        }),
-        const SizedBox(height: 10),
-        _tile(context, Icons.backup_rounded, const Color(0xFF34D399), 'پشتیبان شماره‌ها', 'ذخیره و بازیابی بعد از نصب مجدد', () {
-          Navigator.push(context, MaterialPageRoute(builder: (_) => _BackupPage(onDone: onReload)));
-        }),
-        const SizedBox(height: 10),
-        _tile(context, Icons.upload_file_rounded, const Color(0xFFA78BFA), 'خروجی لیست مشتریان', 'ذخیره CSV در پوشه دانلود', () async {
-          if (customers.isEmpty) {
-            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('مشتری‌ای نیست')));
-            return;
-          }
-          final buf = StringBuffer('نام,شماره,تگ,یادداشت,تعداد تماس\n');
-          for (final c in customers) {
-            final note = (c.note ?? '').replaceAll(',', '،').replaceAll('\n', ' ');
-            buf.writeln('${c.name},${c.phone},${c.tag},$note,${c.callCount}');
-          }
-          try {
-            const ch = MethodChannel('ir.apadanasleep.customer_callbook/call_log');
-            final name = 'customers_${DateTime.now().millisecondsSinceEpoch}.csv';
-            final path = await ch.invokeMethod<String>('saveBackupFile', {
-              'name': name,
-              'content': buf.toString(),
-            });
-            if (context.mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('ذخیره شد: ${path ?? name}')),
-              );
+        // سوییچ پاپ‌آپ نتیجه
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+          decoration: BoxDecoration(
+            color: AppColors.surfaceElevated,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: AppColors.border),
+          ),
+          child: SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('پاپ‌آپ نتیجه تماس', style: TextStyle(fontWeight: FontWeight.w700)),
+            subtitle: const Text('بعد از قطع تماس برای مشتری دفترچه'),
+            value: _resultPopup,
+            activeColor: AppColors.primary,
+            onChanged: _setResultPopup,
+            secondary: Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: const Color(0xFF8B5CF6).withOpacity(0.12),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(Icons.fact_check_rounded, color: Color(0xFF8B5CF6)),
+            ),
+          ),
+        ),
+
+        const SizedBox(height: 22),
+        _sectionLabel(context, 'مجوزها'),
+        _groupCard([
+          _nav(context, Icons.shield_rounded, const Color(0xFF3B82F6), 'مرکز مجوزها',
+              'تلفن، گزارش تماس، مخاطبین، اعلان، پاپ‌آپ', () {
+            Navigator.push(context, MaterialPageRoute(builder: (_) => const _PermissionsHubPage()));
+          }),
+        ]),
+
+        const SizedBox(height: 18),
+        _sectionLabel(context, 'تماس‌های گوشی'),
+        _groupCard([
+          _nav(context, Icons.phone_android_rounded, AppColors.primary, 'تماس‌های گوشی',
+              'دریافت تاریخچه و افزودن به مشتریان', () async {
+            await Navigator.push(context, MaterialPageRoute(builder: (_) => const CallSyncPage()));
+            widget.onReload();
+          }),
+        ]),
+
+        const SizedBox(height: 18),
+        _sectionLabel(context, 'مخاطبین و دسته‌بندی'),
+        _groupCard([
+          _nav(context, Icons.palette_rounded, AppColors.warning, 'رنگ دسته‌بندی‌ها',
+              'تنظیم رنگ گروه‌های مشتریان', () {
+            Navigator.push(context, MaterialPageRoute(builder: (_) => const _TagColorPage()));
+          }),
+          _nav(context, Icons.sticky_note_2_rounded, const Color(0xFF38BDF8), 'یادداشت آماده',
+              'مدیریت یادداشت‌های سریع', () {
+            Navigator.push(context, MaterialPageRoute(builder: (_) => const _NoteTemplatesPage()));
+          }),
+        ]),
+
+        const SizedBox(height: 18),
+        _sectionLabel(context, 'امکانات کاربردی'),
+        _groupCard([
+          _nav(context, Icons.event_note_rounded, const Color(0xFF10B981), 'امروز زنگ بزن',
+              'یادآوری تماس امروز و روزهای آینده', () {
+            Navigator.push(context, MaterialPageRoute(builder: (_) => const RemindersPage()));
+          }),
+          _nav(context, Icons.insights_rounded, const Color(0xFF8B5CF6), 'گزارش هفتگی',
+              'آمار تماس و وضعیت فروش', () {
+            Navigator.push(context, MaterialPageRoute(builder: (_) => const WeeklyReportPage()));
+          }),
+          _nav(context, Icons.backup_rounded, const Color(0xFF34D399), 'پشتیبان شماره‌ها',
+              'ذخیره و بازیابی بعد از نصب مجدد', () {
+            Navigator.push(context, MaterialPageRoute(builder: (_) => const _BackupPage()));
+          }),
+        ]),
+
+        const SizedBox(height: 18),
+        _sectionLabel(context, 'فایل و داده‌ها'),
+        _groupCard([
+          _nav(context, Icons.upload_file_rounded, const Color(0xFFA78BFA), 'خروجی لیست مشتریان',
+              'ذخیره CSV در پوشه دانلود', () async {
+            try {
+              final csv = await BackupService.instance.exportCsv();
+              const ch = MethodChannel('ir.apadanasleep.customer_callbook/call_log');
+              final path = await ch.invokeMethod<String>('saveToDownloads', {
+                'content': csv,
+                'fileName': 'customers_export.csv',
+              });
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text(path != null ? 'ذخیره شد: $path' : 'ذخیره شد')),
+                );
+              }
+            } catch (e) {
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطا: $e')));
+              }
             }
-          } catch (e) {
-            if (context.mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطا در ذخیره: $e')));
-            }
-          }
-        }),
-        _tile(context, Icons.info_rounded, AppColors.textMuted, 'درباره برنامه', 'نسخه ۱.۲۱.۰ (۳۸) — info@apadanasleep.ir', () {
-          Navigator.push(context, MaterialPageRoute(builder: (_) => const _AboutPage()));
-        }),
+          }),
+        ]),
+
+        const SizedBox(height: 18),
+        _sectionLabel(context, 'اطلاعات برنامه'),
+        _groupCard([
+          _nav(context, Icons.info_rounded, AppColors.textMuted, 'درباره برنامه',
+              'نسخه و پشتیبانی', () {
+            Navigator.push(context, MaterialPageRoute(builder: (_) => const _AboutPage()));
+          }),
+        ]),
       ],
     );
   }
+
+  Widget _sectionLabel(BuildContext context, String text) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8, right: 4),
+      child: Text(text, style: Theme.of(context).textTheme.titleSmall?.copyWith(
+        color: AppColors.textSecondary,
+        fontWeight: FontWeight.w700,
+      )),
+    );
+  }
+
+  Widget _groupCard(List<Widget> children) {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.surfaceElevated,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppColors.border),
+        boxShadow: [BoxShadow(color: AppColors.shadow, blurRadius: 12, offset: const Offset(0, 4))],
+      ),
+      child: Column(
+        children: [
+          for (int i = 0; i < children.length; i++) ...[
+            children[i],
+            if (i < children.length - 1)
+              Divider(height: 1, indent: 64, color: AppColors.border.withOpacity(0.6)),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _nav(BuildContext context, IconData icon, Color color, String title, String sub, VoidCallback onTap) {
+    return ListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+      leading: Container(
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.12),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Icon(icon, color: color, size: 22),
+      ),
+      title: Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
+      subtitle: Text(sub, style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+      trailing: Icon(Icons.chevron_left_rounded, color: AppColors.textMuted),
+      onTap: onTap,
+    );
+  }
+}
 
   Widget _tile(BuildContext context, IconData icon, Color color, String title, String sub, VoidCallback? onTap) {
     return Padding(
