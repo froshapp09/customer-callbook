@@ -692,7 +692,7 @@ class _SettingsTabState extends State<_SettingsTab> {
           }),
           _nav(context, Icons.backup_rounded, const Color(0xFF34D399), 'پشتیبان شماره‌ها',
               'ذخیره و بازیابی بعد از نصب مجدد', () {
-            Navigator.push(context, MaterialPageRoute(builder: (_) => const _BackupPage()));
+            Navigator.push(context, MaterialPageRoute(builder: (_) => _BackupPage(onDone: widget.onReload)));
           }),
         ]),
 
@@ -781,41 +781,6 @@ class _SettingsTabState extends State<_SettingsTab> {
     );
   }
 }
-
-  Widget _tile(BuildContext context, IconData icon, Color color, String title, String sub, VoidCallback? onTap) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: _GlassCard(
-        onTap: onTap,
-        child: Row(
-          children: [
-            if (onTap != null) Icon(Icons.chevron_left, color: AppColors.textMuted),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(title, style: Theme.of(context).textTheme.titleMedium),
-                  Text(sub, style: Theme.of(context).textTheme.bodySmall),
-                ],
-              ),
-            ),
-            const SizedBox(width: 12),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(14),
-                gradient: LinearGradient(colors: [color, color.withOpacity(0.75)]),
-                boxShadow: [BoxShadow(color: color.withOpacity(0.35), blurRadius: 10, offset: const Offset(0, 4))],
-              ),
-              child: Icon(icon, color: Colors.white, size: 22),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 
 class _TagColorPage extends StatefulWidget {
   const _TagColorPage();
@@ -1086,8 +1051,8 @@ class _NoteTemplatesPageState extends State<_NoteTemplatesPage> {
 
 
 class _BackupPage extends StatefulWidget {
-  final VoidCallback onDone;
-  const _BackupPage({required this.onDone});
+  final VoidCallback? onDone;
+  const _BackupPage({this.onDone});
   @override
   State<_BackupPage> createState() => _BackupPageState();
 }
@@ -1151,7 +1116,7 @@ class _BackupPageState extends State<_BackupPage> {
         throw Exception('نتوانست فایل را بخواند');
       }
       final n = await BackupService.instance.importJson(raw);
-      widget.onDone();
+      widget.onDone?.call();
       if (mounted) {
         setState(() => _msg = '✓ $n مشتری از فایل بازیابی شد');
         ScaffoldMessenger.of(context).showSnackBar(
