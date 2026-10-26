@@ -149,6 +149,25 @@ class _CustomerDetailPageState extends State<CustomerDetailPage> {
     return Jalali.timeAgoOrJalali(dt);
   }
 
+
+  Widget _remChip(String label, DateTime Function() whenFn) {
+    return ActionChip(
+      avatar: const Icon(Icons.alarm, size: 16),
+      label: Text(label),
+      onPressed: () async {
+        final w = whenFn();
+        final u = _customer.copyWith(reminderAt: w);
+        await _service.update(u);
+        setState(() => _customer = u);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('یادآوری: ${Jalali.format(w, withTime: true)}')),
+          );
+        }
+      },
+    );
+  }
+
   Color _avatarColor(String name) {
     final colors = AppColors.avatarPalette;
     return colors[name.hashCode.abs() % colors.length];
