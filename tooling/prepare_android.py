@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Copy MainActivity.kt (all classes) + widget resources + force compileSdk 35."""
+"""Copy MainActivity.kt + widget resources + icons + force compileSdk 35."""
 from pathlib import Path
 import re
 import shutil
@@ -15,7 +15,8 @@ WIDGET_RECEIVER = '''
         <receiver
             android:name=".DaftarcheWidgetProvider"
             android:exported="true"
-            android:label="@string/widget_name">
+            android:enabled="true"
+            android:label="فروشیار">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE"/>
             </intent-filter>
@@ -24,6 +25,129 @@ WIDGET_RECEIVER = '''
                 android:resource="@xml/daftarche_widget_info"/>
         </receiver>
 '''
+
+# Fallback content if tooling/res files missing from upload
+FALLBACK = {
+    ("values", "strings.xml"): '''<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">فروشیار</string>
+    <string name="widget_name">فروشیار</string>
+    <string name="widget_description">تماس‌های امروز فروشیار</string>
+</resources>
+''',
+    ("values", "widget_strings.xml"): '''<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="widget_description">تماس‌های امروز فروشیار</string>
+    <string name="widget_name">فروشیار</string>
+    <string name="app_name">فروشیار</string>
+</resources>
+''',
+    ("values", "ic_launcher_background.xml"): '''<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="ic_launcher_background">#6C63FF</color>
+</resources>
+''',
+    ("xml", "daftarche_widget_info.xml"): '''<?xml version="1.0" encoding="utf-8"?>
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:minWidth="180dp"
+    android:minHeight="110dp"
+    android:minResizeWidth="140dp"
+    android:minResizeHeight="80dp"
+    android:updatePeriodMillis="1800000"
+    android:initialLayout="@layout/daftarche_widget"
+    android:resizeMode="horizontal|vertical"
+    android:widgetCategory="home_screen"
+    android:description="@string/widget_description" />
+''',
+    ("layout", "daftarche_widget.xml"): '''<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="16dp"
+    android:background="@drawable/widget_bg">
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="فروشیار"
+            android:textColor="#FFFFFF"
+            android:textSize="13sp"
+            android:textStyle="bold" />
+        <TextView
+            android:id="@+id/widget_count"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:minWidth="28dp"
+            android:gravity="center"
+            android:paddingLeft="8dp"
+            android:paddingRight="8dp"
+            android:paddingTop="2dp"
+            android:paddingBottom="2dp"
+            android:text="0"
+            android:textColor="#FFFFFF"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            android:background="@drawable/widget_badge" />
+    </LinearLayout>
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="2dp"
+        android:text="تماس‌های امروز"
+        android:textColor="#99A0B0"
+        android:textSize="11sp" />
+    <TextView
+        android:id="@+id/widget_line1"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:text="تماس امروزی ثبت نشده"
+        android:textColor="#FFFFFF"
+        android:textSize="12sp"
+        android:maxLines="1"
+        android:ellipsize="end" />
+    <TextView
+        android:id="@+id/widget_line2"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:text=""
+        android:textColor="#B0B8C8"
+        android:textSize="12sp"
+        android:maxLines="1"
+        android:ellipsize="end" />
+    <TextView
+        android:id="@+id/widget_line3"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:text=""
+        android:textColor="#B0B8C8"
+        android:textSize="12sp"
+        android:maxLines="1"
+        android:ellipsize="end" />
+</LinearLayout>
+''',
+    ("drawable", "widget_bg.xml"): '''<?xml version="1.0" encoding="utf-8"?>
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+    <solid android:color="#1A1730"/>
+    <corners android:radius="16dp"/>
+</shape>
+''',
+    ("drawable", "widget_badge.xml"): '''<?xml version="1.0" encoding="utf-8"?>
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+    <solid android:color="#6C63FF"/>
+    <corners android:radius="10dp"/>
+</shape>
+''',
+}
 
 
 def patch_sdk() -> None:
@@ -44,6 +168,29 @@ def patch_sdk() -> None:
         print("sdk", f)
 
 
+def write_res(sub: str, name: str, content: str) -> None:
+    dst = RES / sub / name
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    dst.write_text(content, encoding="utf-8")
+    print("wrote", dst)
+
+
+def install_widget_res() -> None:
+    for (sub, name), content in FALLBACK.items():
+        src = TOOLING / "res" / sub / name
+        if src.exists():
+            dst = RES / sub / name
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(src, dst)
+            print("res", dst)
+        else:
+            write_res(sub, name, content)
+    # always ensure critical files exist (overwrite with fallback if copy empty)
+    for key, content in FALLBACK.items():
+        path = RES / key[0] / key[1]
+        if not path.exists() or path.stat().st_size < 20:
+            write_res(key[0], key[1], content)
+
 
 def install_mipmaps() -> None:
     for folder in (
@@ -60,28 +207,23 @@ def install_mipmaps() -> None:
                 print("icon", dst_dir / f.name)
 
 
-def install_widget_res() -> bool:
-    pairs = [
-        ("layout", "daftarche_widget.xml"),
-        ("xml", "daftarche_widget_info.xml"),
-        ("drawable", "widget_bg.xml"),
-        ("drawable", "widget_badge.xml"),
-        ("values", "widget_strings.xml"),
-        ("values", "strings.xml"),
-        ("values", "ic_launcher_background.xml"),
-    ]
-    ok = True
-    for sub, name in pairs:
-        src = TOOLING / "res" / sub / name
-        if not src.exists():
-            print("MISSING", src)
-            ok = False
-            continue
-        dst = RES / sub / name
-        dst.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(src, dst)
-        print("res", dst)
-    return ok
+def ensure_widget_in_manifest() -> None:
+    shutil.copy2(TOOLING / "AndroidManifest.xml", MANIFEST)
+    man = MANIFEST.read_text(encoding="utf-8")
+    # normalize label without string resource dependency
+    man = man.replace('android:label="@string/widget_name"', 'android:label="فروشیار"')
+    man = man.replace('android:label="@string/app_name"', 'android:label="فروشیار"')
+    # strip duplicates then add one
+    man = re.sub(
+        r"\s*<receiver[\s\S]*?DaftarcheWidgetProvider[\s\S]*?</receiver>\s*",
+        "\n",
+        man,
+    )
+    if "</application>" not in man:
+        raise SystemExit("no application end in manifest")
+    man = man.replace("</application>", WIDGET_RECEIVER + "\n    </application>", 1)
+    MANIFEST.write_text(man, encoding="utf-8")
+    print("manifest widget OK")
 
 
 def main() -> None:
@@ -117,34 +259,31 @@ def main() -> None:
         if stale.exists():
             stale.unlink()
 
-    widget_ok = install_widget_res()
+    install_widget_res()
     install_mipmaps()
+    ensure_widget_in_manifest()
 
-    shutil.copy2(TOOLING / "AndroidManifest.xml", MANIFEST)
-    man = MANIFEST.read_text(encoding="utf-8")
-    # strip any old widget
-    man = re.sub(
-        r"\s*<receiver[\s\S]*?DaftarcheWidgetProvider[\s\S]*?</receiver>\s*",
-        "\n",
-        man,
-    )
-    if widget_ok:
-        # ensure string resources merged: widget_strings has widget_name
-        if "</application>" in man:
-            man = man.replace("</application>", WIDGET_RECEIVER + "\n    </application>", 1)
-        else:
-            raise SystemExit("no application end")
-        print("widget receiver registered")
-    else:
-        print("widget SKIPPED (resources missing)")
+    # hard verify
+    for rel in (
+        "xml/daftarche_widget_info.xml",
+        "layout/daftarche_widget.xml",
+        "drawable/widget_bg.xml",
+        "values/strings.xml",
+    ):
+        p = RES / rel
+        if not p.exists():
+            raise SystemExit(f"missing after install: {p}")
+        print("verify", p)
 
-    MANIFEST.write_text(man, encoding="utf-8")
-    if "daftarche_widget_info" in man and not (RES / "xml" / "daftarche_widget_info.xml").exists():
-        raise SystemExit("manifest refs widget but xml missing")
+    if "DaftarcheWidgetProvider" not in MANIFEST.read_text(encoding="utf-8"):
+        raise SystemExit("widget receiver missing from manifest")
+    if "daftarche_widget_info" not in MANIFEST.read_text(encoding="utf-8"):
+        raise SystemExit("widget meta missing")
+
     for name in ("PhoneStateReceiver", "CallMonitorService", "CallOverlayService"):
-        if name not in man:
+        if name not in MANIFEST.read_text(encoding="utf-8"):
             raise SystemExit(f"{name} missing from manifest")
-    print("manifest OK")
+
     patch_sdk()
     print("SUCCESS prepare_android")
 
