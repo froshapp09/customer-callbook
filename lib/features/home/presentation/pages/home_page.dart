@@ -36,6 +36,7 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   bool _showOnboarding = false;
   bool _bootChecked = false;
+  int _remindDue = 0;
 
   int _tab = 0;
   int _refreshToken = 0;
@@ -63,12 +64,13 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _load() async {
     setState(() => _loading = true);
-    // تماس‌های گوشی را خودکار وارد سابقه نکن — فقط تماس واقعی/از داخل اپ
     final list = await _service.getAll();
+    final due = await _service.remindersDueToday();
     WidgetService.instance.update();
     if (mounted) {
       setState(() {
         _customers = list;
+        _remindDue = due.length;
         _loading = false;
         _refreshToken++;
       });
@@ -230,6 +232,7 @@ class _HomePageState extends State<HomePage> {
                 customers: _customers,
                 loading: _loading,
                 todayCount: _todayCount,
+                remindDue: _remindDue,
                 onRefresh: _load,
                 onDial: _dial,
                 onOpenDetail: (c) async {
@@ -238,6 +241,10 @@ class _HomePageState extends State<HomePage> {
                 },
                 onSync: () async {
                   await Navigator.push(context, MaterialPageRoute(builder: (_) => const CallSyncPage()));
+                  _load();
+                },
+                onReminders: () async {
+                  await Navigator.push(context, MaterialPageRoute(builder: (_) => const RemindersPage()));
                   _load();
                 },
               ),
@@ -339,19 +346,23 @@ class _CallsTab extends StatelessWidget {
   final List<Customer> customers;
   final bool loading;
   final int todayCount;
+  final int remindDue;
   final VoidCallback onRefresh;
   final Future<void> Function(String) onDial;
   final Future<void> Function(Customer) onOpenDetail;
   final Future<void> Function() onSync;
+  final Future<void> Function() onReminders;
 
   const _CallsTab({
     required this.customers,
     required this.loading,
     required this.todayCount,
+    required this.remindDue,
     required this.onRefresh,
     required this.onDial,
     required this.onOpenDetail,
     required this.onSync,
+    required this.onReminders,
   });
 
   String _timeAgo(DateTime? dt) {
@@ -383,19 +394,86 @@ class _CallsTab extends StatelessWidget {
                 children: [
                   _CallsHeaderClock(),
                   const SizedBox(height: 18),
+                  // امروز زنگ بزن (اصلی) + همگام گوشی (فرعی)
                   Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Expanded(child: _StatCard(icon: Icons.person_add_alt_1_rounded, iconColor: AppColors.accent, value: '${customers.length}', label: 'مشتریان')),
-                      const SizedBox(width: 12),
-                      Expanded(child: _StatCard(icon: Icons.phone_callback_rounded, iconColor: AppColors.primary, value: '$todayCount', label: 'تماس امروز')),
+                      Expanded(
+                        flex: 3,
+                        child: InkWell(
+                          onTap: onReminders,
+                          borderRadius: BorderRadius.circular(18),
+                          child: _GlassCard(
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 4),
+                              child: Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(12),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.warning.withOpacity(0.15),
+                                      borderRadius: BorderRadius.circular(14),
+                                    ),
+                                    child: Icon(Icons.alarm_rounded, color: AppColors.warning, size: 26),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text('امروز زنگ بزن', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: AppColors.textPrimary)),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          remindDue == 0 ? 'یادآوری برای امروز ندارید' : '$remindDue مورد برای پیگیری',
+                                          style: Theme.of(context).textTheme.bodySmall,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  if (remindDue > 0)
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: AppColors.danger,
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: Text('$remindDue', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
+                                    ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        flex: 2,
+                        child: InkWell(
+                          onTap: onSync,
+                          borderRadius: BorderRadius.circular(18),
+                          child: _GlassCard(
+                            child: Column(
+                              children: [
+                                Icon(Icons.phone_android_rounded, color: AppColors.primary, size: 22),
+                                const SizedBox(height: 6),
+                                Text('همگام گوشی', textAlign: TextAlign.center, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+                                const SizedBox(height: 2),
+                                Text('تماس‌ها', textAlign: TextAlign.center, style: TextStyle(fontSize: 10, color: AppColors.textMuted)),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
                     ],
                   ),
-                  const SizedBox(height: 14),
-                  _PrimaryAction(
-                    icon: Icons.phone_android_rounded,
-                    title: 'دریافت تماس‌های گوشی',
-                    subtitle: 'برای افزودن به مشتریان / خروجی CSV',
-                    onTap: onSync,
+                  const SizedBox(height: 12),
+                  // آمار فشرده
+                  Row(
+                    children: [
+                      Expanded(child: _MiniStat(label: 'مشتریان', value: '${customers.length}')),
+                      const SizedBox(width: 8),
+                      Expanded(child: _MiniStat(label: 'تماس امروز', value: '$todayCount')),
+                    ],
                   ),
                   const SizedBox(height: 22),
                   Row(
@@ -485,6 +563,30 @@ class _SliverLoading extends StatelessWidget {
   const _SliverLoading();
   @override
   Widget build(BuildContext context) => SliverFillRemaining(child: Center(child: CircularProgressIndicator(color: AppColors.primary)));
+}
+
+class _MiniStat extends StatelessWidget {
+  final String label;
+  final String value;
+  const _MiniStat({required this.label, required this.value});
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceElevated,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Row(
+        children: [
+          Text(value, style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18, color: AppColors.primary)),
+          const SizedBox(width: 8),
+          Expanded(child: Text(label, style: Theme.of(context).textTheme.bodySmall)),
+        ],
+      ),
+    );
+  }
 }
 
 class _StatCard extends StatelessWidget {

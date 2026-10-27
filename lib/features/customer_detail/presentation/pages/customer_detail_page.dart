@@ -576,38 +576,78 @@ Align(
                     : r.type == 3
                         ? AppColors.danger
                         : AppColors.info;
+                final chipBg = color.withOpacity(0.12);
                 return Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
+                  padding: const EdgeInsets.only(bottom: 12),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(14),
                     decoration: BoxDecoration(
                       color: AppColors.surfaceElevated,
-                      borderRadius: BorderRadius.circular(14),
+                      borderRadius: BorderRadius.circular(18),
                       border: Border.all(color: AppColors.border),
                     ),
-                    child: Row(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        Icon(
-                          r.type == 1
-                              ? Icons.call_received_rounded
-                              : r.type == 3
-                                  ? Icons.call_missed_rounded
-                                  : Icons.call_made_rounded,
-                          color: color,
-                          size: 20,
+                        Row(
+                          children: [
+                            IconButton(
+                              visualDensity: VisualDensity.compact,
+                              onPressed: () => _call(),
+                              icon: Icon(Icons.phone_rounded, color: AppColors.accent, size: 20),
+                            ),
+                            const Spacer(),
+                            Text(Jalali.format(r.at), style: TextStyle(fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+                          ],
                         ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(r.typeLabel, style: TextStyle(fontWeight: FontWeight.w600, color: color, fontSize: 13)),
-                              Text(Jalali.format(r.at, withTime: true), style: Theme.of(context).textTheme.bodySmall),
-                            ],
+                        const SizedBox(height: 6),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 6,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              decoration: BoxDecoration(color: chipBg, borderRadius: BorderRadius.circular(8)),
+                              child: Text(r.typeLabel, style: TextStyle(color: color, fontWeight: FontWeight.w700, fontSize: 12)),
+                            ),
+                            if (_customer.tag.isNotEmpty)
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                decoration: BoxDecoration(color: AppColors.primary.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
+                                child: Text('دسته: ${_customer.tag}', style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.w600, fontSize: 12)),
+                              ),
+                            if (_customer.status.isNotEmpty)
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                decoration: BoxDecoration(color: AppColors.info.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
+                                child: Text(_customer.status, style: TextStyle(color: AppColors.info, fontWeight: FontWeight.w600, fontSize: 12)),
+                              ),
+                          ],
+                        ),
+                        if (_customer.note != null && _customer.note!.trim().isNotEmpty) ...[
+                          const SizedBox(height: 10),
+                          Text(_customer.note!, style: Theme.of(context).textTheme.bodyMedium),
+                        ],
+                        const SizedBox(height: 10),
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: AppColors.warning.withOpacity(0.15),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.schedule, size: 14, color: AppColors.warning),
+                                const SizedBox(width: 4),
+                                Text(_timeAgo(r.at), style: TextStyle(color: AppColors.warning, fontWeight: FontWeight.w600, fontSize: 12)),
+                              ],
+                            ),
                           ),
                         ),
-                        if (r.durationSec > 0)
-                          Text('${r.durationSec}s', style: Theme.of(context).textTheme.bodySmall),
                       ],
                     ),
                   ),

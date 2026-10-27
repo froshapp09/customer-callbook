@@ -221,7 +221,7 @@ def ensure_widget_in_manifest() -> None:
     )
     if "</application>" not in man:
         raise SystemExit("no application end in manifest")
-    # WIDGET DISABLED: man = man.replace("</application>", WIDGET_RECEIVER + "\n    </application>", 1)
+    man = man.replace("</application>", WIDGET_RECEIVER + "\n    </application>", 1)
     MANIFEST.write_text(man, encoding="utf-8")
     print("manifest OK (widget disabled)")
 

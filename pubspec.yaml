@@ -1,7 +1,7 @@
 name: customer_callbook
 description: فروشیار — مدیریت تماس و مشتری
 publish_to: 'none'
-version: 1.36.4+82
+version: 1.37.0+83
 
 environment:
   sdk: '>=3.2.0 <4.0.0'
