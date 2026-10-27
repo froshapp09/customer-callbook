@@ -74,38 +74,7 @@
             android:exported="false"
             android:enabled="true"
             android:foregroundServiceType="phoneCall"/>
-
-        <receiver
-            android:name=".PhoneStateReceiver"
-            android:exported="true"
-            android:enabled="true">
-            <intent-filter android:priority="999">
-                <action android:name="android.intent.action.PHONE_STATE"/>
-            </intent-filter>
-        </receiver>
-
-        <receiver
-            android:name=".BootReceiver"
-            android:exported="true"
-            android:enabled="true">
-            <intent-filter>
-                <action android:name="android.intent.action.BOOT_COMPLETED"/>
-            </intent-filter>
-        </receiver>
-
-        <receiver
-            android:name=".DaftarcheWidgetProvider"
-            android:exported="true"
-            android:enabled="true"
-            android:label="فروشیار">
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_UPDATE"/>
-            </intent-filter>
-            <meta-data
-                android:name="android.appwidget.provider"
-                android:resource="@xml/daftarche_widget_info"/>
-        </receiver>
-    </application>
+</application>
 
     <queries>
         <intent>

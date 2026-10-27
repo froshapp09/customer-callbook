@@ -221,9 +221,9 @@ def ensure_widget_in_manifest() -> None:
     )
     if "</application>" not in man:
         raise SystemExit("no application end in manifest")
-    man = man.replace("</application>", WIDGET_RECEIVER + "\n    </application>", 1)
+    # WIDGET DISABLED: man = man.replace("</application>", WIDGET_RECEIVER + "\n    </application>", 1)
     MANIFEST.write_text(man, encoding="utf-8")
-    print("manifest widget OK")
+    print("manifest OK (widget disabled)")
 
 
 def main() -> None:
@@ -275,10 +275,7 @@ def main() -> None:
             raise SystemExit(f"missing after install: {p}")
         print("verify", p)
 
-    if "DaftarcheWidgetProvider" not in MANIFEST.read_text(encoding="utf-8"):
-        raise SystemExit("widget receiver missing from manifest")
-    if "daftarche_widget_info" not in MANIFEST.read_text(encoding="utf-8"):
-        raise SystemExit("widget meta missing")
+    # widget receiver intentionally optional
 
     for name in ("PhoneStateReceiver", "CallMonitorService", "CallOverlayService"):
         if name not in MANIFEST.read_text(encoding="utf-8"):
