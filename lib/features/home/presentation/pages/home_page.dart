@@ -596,7 +596,6 @@ class _SettingsTabState extends State<_SettingsTab> {
   @override
   void initState() {
     super.initState();
-    _checkOnboarding();
     _loadPrefs();
   }
 
@@ -898,7 +897,6 @@ class _CallDetectTileState extends State<_CallDetectTile> {
   @override
   void initState() {
     super.initState();
-    _checkOnboarding();
     CallListenerService.instance.isEnabled().then((v) {
       if (mounted) setState(() => _on = v);
     });
@@ -988,18 +986,7 @@ class _NoteTemplatesPageState extends State<_NoteTemplatesPage> {
   @override
   void initState() {
     super.initState();
-    _checkOnboarding();
     _load();
-  }
-
-
-  Future<void> _checkOnboarding() async {
-    final p = await SharedPreferences.getInstance();
-    final done = p.getBool('onboarding_done_v1') ?? false;
-    if (mounted) setState(() {
-      _showOnboarding = !done;
-      _bootChecked = true;
-    });
   }
 
   Future<void> _load() async {
