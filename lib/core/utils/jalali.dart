@@ -39,6 +39,14 @@ class Jalali {
 
   static List<int> toJalali(DateTime dt) => _toJalali(dt.year, dt.month, dt.day);
 
+  static const _weekdays = ['دوشنبه', 'سه‌شنبه', 'چهارشنبه', 'پنجشنبه', 'جمعه', 'شنبه', 'یکشنبه'];
+  /// DateTime.weekday: 1=Mon ... 7=Sun
+  static String weekdayName(DateTime dt) => _weekdays[dt.weekday - 1];
+
+  static String clock(DateTime dt) =>
+      '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+
+
   static int daysInMonth(int jy, int jm) {
     if (jm <= 6) return 31;
     if (jm <= 11) return 30;

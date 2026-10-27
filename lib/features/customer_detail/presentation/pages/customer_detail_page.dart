@@ -152,6 +152,29 @@ class _CustomerDetailPageState extends State<CustomerDetailPage> {
   }
 
 
+
+  Widget _infoRow(IconData icon, String label, String value, {bool ltr = false}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      child: Row(
+        children: [
+          Icon(icon, size: 20, color: AppColors.textMuted),
+          const SizedBox(width: 10),
+          Text(label, style: TextStyle(color: AppColors.textSecondary)),
+          const Spacer(),
+          Flexible(
+            child: Text(
+              value,
+              textAlign: TextAlign.left,
+              textDirection: ltr ? TextDirection.ltr : TextDirection.rtl,
+              style: const TextStyle(fontWeight: FontWeight.w700),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _remChip(String label, DateTime Function() whenFn) {
     return ActionChip(
       avatar: const Icon(Icons.alarm, size: 16),
@@ -320,7 +343,33 @@ class _CustomerDetailPageState extends State<CustomerDetailPage> {
               child: ElevatedButton(onPressed: _saveNote, child: const Text('ذخیره یادداشت')),
             ),
             const SizedBox(height: 24),
+            
+            const SizedBox(height: 16),
             Align(
+              alignment: Alignment.centerRight,
+              child: Text('اطلاعات پایه', style: Theme.of(context).textTheme.titleMedium),
+            ),
+            const SizedBox(height: 10),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+              decoration: BoxDecoration(
+                color: AppColors.surfaceElevated,
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: AppColors.border),
+              ),
+              child: Column(
+                children: [
+                  _infoRow(Icons.phone_android_rounded, 'شماره', Customer.displayPhone(_customer.phone), ltr: true),
+                  Divider(height: 1, color: AppColors.border),
+                  _infoRow(Icons.label_rounded, 'دسته', _customer.tag.isEmpty ? '—' : _customer.tag),
+                  Divider(height: 1, color: AppColors.border),
+                  _infoRow(Icons.flag_rounded, 'وضعیت', _customer.status),
+                  Divider(height: 1, color: AppColors.border),
+                  _infoRow(Icons.event_rounded, 'تاریخ ثبت', Jalali.format(_customer.createdAt)),
+                ],
+              ),
+            ),
+Align(
               alignment: Alignment.centerRight,
               child: Text('وضعیت فروش', style: Theme.of(context).textTheme.titleMedium),
             ),
@@ -396,72 +445,109 @@ class _CustomerDetailPageState extends State<CustomerDetailPage> {
               ),
             ),
             const SizedBox(height: 24),
-            Align(
-              alignment: Alignment.centerRight,
-              child: Text('یادآوری تماس مجدد', style: Theme.of(context).textTheme.titleMedium),
-            ),
-            const SizedBox(height: 10),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                _remChip('۱ ساعت', () => DateTime.now().add(const Duration(hours: 1))),
-                _remChip('۳ ساعت', () => DateTime.now().add(const Duration(hours: 3))),
-                _remChip('امروز عصر', () {
-                  final n = DateTime.now();
-                  var t = DateTime(n.year, n.month, n.day, 18, 0);
-                  if (!t.isAfter(n)) t = n.add(const Duration(hours: 2));
-                  return t;
-                }),
-                _remChip('فردا', () {
-                  final n = DateTime.now();
-                  return DateTime(n.year, n.month, n.day + 1, 10, 0);
-                }),
-                _remChip('۳ روز بعد', () {
-                  final n = DateTime.now();
-                  return DateTime(n.year, n.month, n.day + 3, 10, 0);
-                }),
-                _remChip('یک هفته', () {
-                  final n = DateTime.now();
-                  return DateTime(n.year, n.month, n.day + 7, 10, 0);
-                }),
-                ActionChip(
-                  avatar: const Icon(Icons.edit_calendar, size: 16),
-                  label: const Text('تاریخ شمسی'),
-                  onPressed: () async {
-                    final when = await showJalaliDateTimePicker(context, initial: _customer.reminderAt);
-                    if (when == null || !mounted) return;
-                    final u = _customer.copyWith(reminderAt: when);
-                    await _service.update(u);
-                    await ReminderService.instance.schedule(u);
-                    setState(() => _customer = u);
-                    if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('یادآوری و اعلان: ${Jalali.format(when, withTime: true)}')),
-                      );
-                    }
-                  },
-                ),
-              ],
-            ),
-            if (_customer.reminderAt != null) ...[
-              const SizedBox(height: 8),
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: Icon(Icons.notifications_active, color: AppColors.warning),
-                title: Text('یادآوری: ${Jalali.format(_customer.reminderAt!, withTime: true)}'),
-                trailing: IconButton(
-                  icon: Icon(Icons.close, color: AppColors.danger),
-                  onPressed: () async {
-                    final u = _customer.copyWith(clearReminder: true);
-                    await _service.update(u);
-                    await ReminderService.instance.cancel(u);
-                    setState(() => _customer = u);
-                  },
-                ),
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: AppColors.surfaceElevated,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: AppColors.border),
               ),
-            ],
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.alarm_rounded, color: AppColors.warning, size: 20),
+                      const SizedBox(width: 8),
+                      Expanded(child: Text('یادآوری تماس', style: Theme.of(context).textTheme.titleMedium)),
+                      PopupMenuButton<String>(
+                        tooltip: 'تنظیم یادآوری',
+                        onSelected: (v) async {
+                          DateTime? when;
+                          final n = DateTime.now();
+                          switch (v) {
+                            case '1h': when = n.add(const Duration(hours: 1)); break;
+                            case '3h': when = n.add(const Duration(hours: 3)); break;
+                            case 'eve':
+                              when = DateTime(n.year, n.month, n.day, 18, 0);
+                              if (!when.isAfter(n)) when = n.add(const Duration(hours: 2));
+                              break;
+                            case 'tmr': when = DateTime(n.year, n.month, n.day + 1, 10, 0); break;
+                            case '3d': when = DateTime(n.year, n.month, n.day + 3, 10, 0); break;
+                            case '1w': when = DateTime(n.year, n.month, n.day + 7, 10, 0); break;
+                            case 'pick':
+                              when = await showJalaliDateTimePicker(context, initial: _customer.reminderAt);
+                              break;
+                          }
+                          if (when == null || !mounted) return;
+                          final u = _customer.copyWith(reminderAt: when);
+                          await _service.update(u);
+                          await ReminderService.instance.schedule(u);
+                          setState(() => _customer = u);
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('یادآوری: ${Jalali.format(when, withTime: true)}')),
+                            );
+                          }
+                        },
+                        itemBuilder: (_) => const [
+                          PopupMenuItem(value: '1h', child: Text('۱ ساعت بعد')),
+                          PopupMenuItem(value: '3h', child: Text('۳ ساعت بعد')),
+                          PopupMenuItem(value: 'eve', child: Text('امروز عصر')),
+                          PopupMenuItem(value: 'tmr', child: Text('فردا')),
+                          PopupMenuItem(value: '3d', child: Text('۳ روز بعد')),
+                          PopupMenuItem(value: '1w', child: Text('یک هفته')),
+                          PopupMenuItem(value: 'pick', child: Text('تاریخ شمسی…')),
+                        ],
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.add_alarm_rounded, size: 18, color: AppColors.primary),
+                              const SizedBox(width: 6),
+                              Text('تنظیم', style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.w700)),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (_customer.reminderAt != null) ...[
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            Jalali.format(_customer.reminderAt!, withTime: true),
+                            style: TextStyle(color: AppColors.textSecondary, fontWeight: FontWeight.w600),
+                          ),
+                        ),
+                        IconButton(
+                          icon: Icon(Icons.close, color: AppColors.danger, size: 20),
+                          onPressed: () async {
+                            final u = _customer.copyWith(clearReminder: true);
+                            await _service.update(u);
+                            await ReminderService.instance.cancel(u);
+                            setState(() => _customer = u);
+                          },
+                        ),
+                      ],
+                    ),
+                  ] else
+                    Padding(
+                      padding: const EdgeInsets.only(top: 6),
+                      child: Text('یادآوری تنظیم نشده', style: Theme.of(context).textTheme.bodySmall),
+                    ),
+                ],
+              ),
+            ),
             const SizedBox(height: 28),
+
             Align(
               alignment: Alignment.centerRight,
               child: Text('فعالیت‌های ثبت‌شده', style: Theme.of(context).textTheme.titleMedium),

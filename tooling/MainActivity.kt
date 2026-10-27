@@ -197,6 +197,19 @@ class MainActivity : FlutterActivity() {
                             result.error("ERROR", e.message, null)
                         }
                     }
+                                        "updateWidget" -> {
+                        try {
+                            val mgr = android.appwidget.AppWidgetManager.getInstance(this)
+                            val cn = android.content.ComponentName(this, DaftarcheWidgetProvider::class.java)
+                            val ids = mgr.getAppWidgetIds(cn)
+                            for (id in ids) {
+                                DaftarcheWidgetProvider.updateOne(this, mgr, id)
+                            }
+                            result.success(ids.size)
+                        } catch (e: Exception) {
+                            result.error("ERROR", e.message, null)
+                        }
+                    }
                     else -> result.notImplemented()
                 }
             }
@@ -417,7 +430,7 @@ class CallMonitorService : Service() {
         } else null
         val n = NotificationCompat.Builder(this, chId)
             .setSmallIcon(android.R.drawable.sym_call_incoming)
-            .setContentTitle("دفترچه مشتریان")
+            .setContentTitle("فروشیار")
             .setContentText("شناسایی تماس فعال است")
             .setOngoing(true)
             .setContentIntent(pi)

@@ -105,7 +105,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
                 child: TextButton(onPressed: _skip, child: const Text('رد کردن')),
               ),
               const SizedBox(height: 8),
-              Text('آموزش فعال‌سازی', style: Theme.of(context).textTheme.headlineMedium),
+              Text('فعال‌سازی فروشیار', style: Theme.of(context).textTheme.headlineMedium),
               const SizedBox(height: 8),
               // progress
               Row(

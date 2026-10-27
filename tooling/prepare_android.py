@@ -44,6 +44,22 @@ def patch_sdk() -> None:
         print("sdk", f)
 
 
+
+def install_mipmaps() -> None:
+    for folder in (
+        "mipmap-mdpi", "mipmap-hdpi", "mipmap-xhdpi", "mipmap-xxhdpi", "mipmap-xxxhdpi", "mipmap-anydpi-v26",
+    ):
+        src_dir = TOOLING / "res" / folder
+        if not src_dir.exists():
+            continue
+        dst_dir = RES / folder
+        dst_dir.mkdir(parents=True, exist_ok=True)
+        for f in src_dir.iterdir():
+            if f.is_file():
+                shutil.copy2(f, dst_dir / f.name)
+                print("icon", dst_dir / f.name)
+
+
 def install_widget_res() -> bool:
     pairs = [
         ("layout", "daftarche_widget.xml"),
@@ -51,6 +67,8 @@ def install_widget_res() -> bool:
         ("drawable", "widget_bg.xml"),
         ("drawable", "widget_badge.xml"),
         ("values", "widget_strings.xml"),
+        ("values", "strings.xml"),
+        ("values", "ic_launcher_background.xml"),
     ]
     ok = True
     for sub, name in pairs:
@@ -100,6 +118,7 @@ def main() -> None:
             stale.unlink()
 
     widget_ok = install_widget_res()
+    install_mipmaps()
 
     shutil.copy2(TOOLING / "AndroidManifest.xml", MANIFEST)
     man = MANIFEST.read_text(encoding="utf-8")

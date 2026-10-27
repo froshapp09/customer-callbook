@@ -58,7 +58,7 @@ class _CustomerCallbookAppState extends State<CustomerCallbookApp> {
   Widget build(BuildContext context) {
     AppColors.isDark = false;
     return MaterialApp(
-      title: 'دفترچه مشتریان',
+      title: 'فروشیار',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
       themeMode: ThemeMode.light,

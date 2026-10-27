@@ -1,3 +1,4 @@
+import 'package:flutter/services.dart';
 import 'package:home_widget/home_widget.dart';
 import 'package:customer_callbook/data/services/customer_service.dart';
 import 'package:customer_callbook/data/models/customer.dart';
@@ -7,6 +8,8 @@ class WidgetService {
   WidgetService._();
 
   static const androidName = 'DaftarcheWidgetProvider';
+  static const qualifiedAndroidName =
+      'ir.apadanasleep.customer_callbook.DaftarcheWidgetProvider';
 
   Future<void> update() async {
     try {
@@ -14,7 +17,6 @@ class WidgetService {
       final now = DateTime.now();
       final start = DateTime(now.year, now.month, now.day);
 
-      // از سابقه تماس‌ها
       final history = await service.getCallHistory(limit: 100);
       final todayRecords = history.where((r) {
         final at = r.at.toLocal();
@@ -44,7 +46,6 @@ class WidgetService {
         if (lines.length >= 3) break;
       }
 
-      // اگر سابقه خالی بود از lastCallAt مشتریان
       if (lines.isEmpty) {
         final todayCust = customers.where((c) {
           final d = c.lastCallAt;
@@ -61,9 +62,7 @@ class WidgetService {
         }
       }
 
-      final count = todayRecords.isNotEmpty
-          ? '${todayRecords.length}'
-          : '${lines.length}';
+      final count = todayRecords.isNotEmpty ? '${todayRecords.length}' : '${lines.length}';
 
       await HomeWidget.saveWidgetData<String>('widget_count', count);
       await HomeWidget.saveWidgetData<String>(
@@ -78,9 +77,18 @@ class WidgetService {
         'widget_line3',
         lines.length > 2 ? lines[2] : '',
       );
-      await HomeWidget.updateWidget(androidName: androidName);
-    } catch (_) {
-      // ویجت اختیاری
-    }
+
+      await HomeWidget.updateWidget(
+        name: androidName,
+        androidName: androidName,
+        qualifiedAndroidName: qualifiedAndroidName,
+      );
+
+      // پشتیبان: آپدیت نیتیو
+      try {
+        const ch = MethodChannel('ir.apadanasleep.customer_callbook/call_log');
+        await ch.invokeMethod('updateWidget');
+      } catch (_) {}
+    } catch (_) {}
   }
 }

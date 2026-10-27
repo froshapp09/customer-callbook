@@ -38,7 +38,7 @@ class _CallSyncPageState extends State<CallSyncPage> {
       if (!phone.isGranted) {
         setState(() {
           _loading = false;
-          _error = 'مجوز تلفن داده نشده.\nتنظیمات → برنامه‌ها → دفترچه مشتریان → مجوزها → تلفن';
+          _error = 'مجوز تلفن داده نشده.\nتنظیمات → برنامه‌ها → فروشیار → مجوزها → تلفن';
         });
         return;
       }

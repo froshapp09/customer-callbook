@@ -285,6 +285,56 @@ class _HomePageState extends State<HomePage> {
   }
 }
 
+
+class _CallsHeaderClock extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final now = DateTime.now();
+    final j = Jalali.toJalali(now);
+    final dayName = Jalali.weekdayName(now);
+    final dateStr = '${j[0]}/${j[1].toString().padLeft(2, '0')}/${j[2].toString().padLeft(2, '0')}';
+    return Row(
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('تماس‌ها', style: Theme.of(context).textTheme.headlineMedium),
+              const SizedBox(height: 4),
+              Text(
+                '$dayName  ·  $dateStr',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppColors.textSecondary),
+              ),
+            ],
+          ),
+        ),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            color: AppColors.primary.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.schedule_rounded, size: 16, color: AppColors.primary),
+              const SizedBox(width: 6),
+              Text(
+                Jalali.clock(now),
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.primary,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class _CallsTab extends StatelessWidget {
   final List<Customer> customers;
   final bool loading;
@@ -331,20 +381,7 @@ class _CallsTab extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('تماس‌ها', style: Theme.of(context).textTheme.headlineMedium),
-                            Text('مدیریت تماس‌ها و مشتریان امروز', style: Theme.of(context).textTheme.bodyMedium),
-                          ],
-                        ),
-                      ),
-                      _GlowIcon(Icons.phone_rounded, AppColors.primary),
-                    ],
-                  ),
+                  _CallsHeaderClock(),
                   const SizedBox(height: 18),
                   Row(
                     children: [
@@ -656,7 +693,7 @@ class _SettingsTabState extends State<_SettingsTab> {
           child: SwitchListTile(
             contentPadding: EdgeInsets.zero,
             title: const Text('پاپ‌آپ نتیجه تماس', style: TextStyle(fontWeight: FontWeight.w700)),
-            subtitle: const Text('بعد از قطع تماس برای مشتری دفترچه'),
+            subtitle: const Text('بعد از قطع تماس برای مشتری ثبت‌شده'),
             value: _resultPopup,
             activeColor: AppColors.primary,
             onChanged: _setResultPopup,
@@ -762,6 +799,28 @@ class _SettingsTabState extends State<_SettingsTab> {
         const SizedBox(height: 18),
         _sectionLabel(context, 'اطلاعات برنامه'),
         _groupCard([
+          _nav(context, Icons.widgets_rounded, const Color(0xFF6366F1), 'ویجت صفحه اصلی',
+              'لمس طولانی صفحه اصلی → ویجت‌ها → فروشیار', () async {
+            await WidgetService.instance.update();
+            if (context.mounted) {
+              showDialog(
+                context: context,
+                builder: (ctx) => AlertDialog(
+                  title: const Text('ویجت صفحه اصلی'),
+                  content: const Text(
+                    '۱) یک‌بار اپ را باز بگذارید تا داده ویجت به‌روز شود.\n'
+                    '۲) روی صفحه اصلی گوشی لمس طولانی کنید.\n'
+                    '۳) «ویجت‌ها» / Widgets را باز کنید.\n'
+                    '۴) «فروشیار» را پیدا کنید و به صفحه بکشید.\n\n'
+                    'اگر در لیست نبود، اپ را یک‌بار Force Stop و دوباره باز کنید.',
+                  ),
+                  actions: [
+                    TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('باشه')),
+                  ],
+                ),
+              );
+            }
+          }),
           _nav(context, Icons.info_rounded, AppColors.textMuted, 'درباره برنامه',
               'نسخه و پشتیبانی', () {
             Navigator.push(context, MaterialPageRoute(builder: (_) => const _AboutPage()));
@@ -1240,9 +1299,9 @@ class _AboutPage extends StatelessWidget {
             child: Icon(Icons.contacts_rounded, size: 64, color: AppColors.primary),
           ),
           const SizedBox(height: 16),
-          Text('دفترچه مشتریان', textAlign: TextAlign.center, style: Theme.of(context).textTheme.headlineMedium),
+          Text('فروشیار', textAlign: TextAlign.center, style: Theme.of(context).textTheme.headlineMedium),
           const SizedBox(height: 8),
-          Text('نسخه ۱.۲۱.۰ (۳۸)', textAlign: TextAlign.center, style: Theme.of(context).textTheme.bodyMedium),
+          Text('نسخه ۱.۳۶.۰', textAlign: TextAlign.center, style: Theme.of(context).textTheme.bodyMedium),
           const SizedBox(height: 24),
           ListTile(
             leading: Icon(Icons.email_outlined, color: AppColors.primary),
@@ -1250,7 +1309,7 @@ class _AboutPage extends StatelessWidget {
             subtitle: const Text('info@apadanasleep.ir'),
             onTap: () async {
               final uri = Uri(scheme: 'mailto', path: 'info@apadanasleep.ir', queryParameters: {
-                'subject': 'دفترچه مشتریان',
+                'subject': 'فروشیار',
               });
               // ignore: deprecated_member_use
               try {
