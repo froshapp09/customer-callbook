@@ -28,11 +28,20 @@ Future<DateTime?> showJalaliDateTimePicker(BuildContext context, {DateTime? init
                 children: [
                   Row(
                     children: [
-                      Expanded(child: _dd('سال', jy, List.generate(8, (i) => now.year - 621 + i - 1), (v) => setSt(() => jy = v))),
+                      Expanded(
+                        flex: 3,
+                        child: _dd('سال', jy, List.generate(6, (i) => jy - 1 + i), (v) => setSt(() => jy = v)),
+                      ),
                       const SizedBox(width: 8),
-                      Expanded(child: _dd('ماه', jm, List.generate(12, (i) => i + 1), (v) => setSt(() => jm = v))),
+                      Expanded(
+                        flex: 2,
+                        child: _dd('ماه', jm, List.generate(12, (i) => i + 1), (v) => setSt(() => jm = v)),
+                      ),
                       const SizedBox(width: 8),
-                      Expanded(child: _dd('روز', jd, List.generate(maxDay, (i) => i + 1), (v) => setSt(() => jd = v))),
+                      Expanded(
+                        flex: 2,
+                        child: _dd('روز', jd, List.generate(maxDay, (i) => i + 1), (v) => setSt(() => jd = v)),
+                      ),
                     ],
                   ),
                   const SizedBox(height: 16),
@@ -72,17 +81,34 @@ Widget _dd(String label, int value, List<int> items, ValueChanged<int> onChanged
       Text(label, style: const TextStyle(fontSize: 12)),
       const SizedBox(height: 4),
       Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 6),
         decoration: BoxDecoration(
           border: Border.all(color: AppColors.border),
           borderRadius: BorderRadius.circular(10),
         ),
-        child: DropdownButton<int>(
-          value: items.contains(value) ? value : items.first,
-          isExpanded: true,
-          underline: const SizedBox.shrink(),
-          items: items.map((e) => DropdownMenuItem(value: e, child: Text('$e'))).toList(),
-          onChanged: (v) { if (v != null) onChanged(v); },
+        child: DropdownButtonHideUnderline(
+          child: DropdownButton<int>(
+            value: items.contains(value) ? value : items.first,
+            isExpanded: true,
+            isDense: true,
+            borderRadius: BorderRadius.circular(12),
+            items: items
+                .map(
+                  (e) => DropdownMenuItem(
+                    value: e,
+                    child: Text(
+                      '$e',
+                      maxLines: 1,
+                      softWrap: false,
+                      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, height: 1.1),
+                    ),
+                  ),
+                )
+                .toList(),
+            onChanged: (v) {
+              if (v != null) onChanged(v);
+            },
+          ),
         ),
       ),
     ],

@@ -161,13 +161,16 @@ class _CustomerDetailPageState extends State<CustomerDetailPage> {
           Icon(icon, size: 20, color: AppColors.textMuted),
           const SizedBox(width: 10),
           Text(label, style: TextStyle(color: AppColors.textSecondary)),
-          const Spacer(),
-          Flexible(
+          const SizedBox(width: 12),
+          Expanded(
             child: Text(
               value,
               textAlign: TextAlign.left,
               textDirection: ltr ? TextDirection.ltr : TextDirection.rtl,
-              style: const TextStyle(fontWeight: FontWeight.w700),
+              maxLines: 1,
+              softWrap: false,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, height: 1.2),
             ),
           ),
         ],
@@ -359,7 +362,7 @@ class _CustomerDetailPageState extends State<CustomerDetailPage> {
               ),
               child: Column(
                 children: [
-                  _infoRow(Icons.phone_android_rounded, 'شماره', Customer.displayPhone(_customer.phone), ltr: true),
+                  _infoRow(Icons.phone_android_rounded, 'شماره', Customer.normalizePhone(_customer.phone), ltr: true),
                   Divider(height: 1, color: AppColors.border),
                   _infoRow(Icons.label_rounded, 'دسته', _customer.tag.isEmpty ? '—' : _customer.tag),
                   Divider(height: 1, color: AppColors.border),
