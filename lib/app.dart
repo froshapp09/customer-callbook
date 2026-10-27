@@ -35,7 +35,13 @@ class _CustomerCallbookAppState extends State<CustomerCallbookApp> {
       await CustomerService().migrateTextEncoding();
       await NoteTemplatesService.instance.getAll(); // auto-repairs templates
     } catch (_) {}
-    ReminderService.instance.checkDueReminders();
+    await ReminderService.instance.init();
+    try {
+      final all = await CustomerService().getAll();
+      for (final c in all) {
+        if (c.reminderAt != null) await ReminderService.instance.schedule(c);
+      }
+    } catch (_) {}
     WidgetService.instance.update();
     SystemChrome.setSystemUIOverlayStyle(
       const SystemUiOverlayStyle(

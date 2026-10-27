@@ -1245,6 +1245,28 @@ class _PermissionsHubPage extends StatelessWidget {
     }
   }
 
+  Widget _row(IconData icon, Color color, String title, String sub, VoidCallback onTap) {
+    return ListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      leading: Container(
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(color: color.withOpacity(0.12), borderRadius: BorderRadius.circular(12)),
+        child: Icon(icon, color: color),
+      ),
+      title: Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
+      subtitle: Text(sub, style: const TextStyle(fontSize: 12)),
+      trailing: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        decoration: BoxDecoration(
+          color: const Color(0xFF22C55E).withOpacity(0.12),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: const Text('تنظیم', style: TextStyle(color: Color(0xFF16A34A), fontSize: 12, fontWeight: FontWeight.w700)),
+      ),
+      onTap: onTap,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -1252,52 +1274,45 @@ class _PermissionsHubPage extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.all(20),
         children: [
-          Text(
-            'برای شناسایی تماس و پاپ‌آپ، این موارد را یک‌بار تنظیم کنید:',
-            style: Theme.of(context).textTheme.bodyMedium,
-          ),
+          Text('دسترسی‌های مورد نیاز برای عملکرد صحیح برنامه', style: Theme.of(context).textTheme.bodyMedium),
           const SizedBox(height: 16),
-          Card(
+          Container(
+            decoration: BoxDecoration(
+              color: AppColors.surfaceElevated,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: AppColors.border),
+            ),
             child: Column(
               children: [
-                ListTile(
-                  leading: const Icon(Icons.phone_in_talk_rounded, color: Color(0xFF22C55E)),
-                  title: const Text('تلفن و گزارش تماس'),
-                  subtitle: const Text('برای تشخیص شماره تماس ورودی'),
-                  trailing: const Icon(Icons.chevron_left),
-                  onTap: () => openAppSettings(),
-                ),
-                const Divider(height: 1),
-                ListTile(
-                  leading: const Icon(Icons.contacts_rounded, color: Color(0xFF3B82F6)),
-                  title: const Text('مخاطبین'),
-                  subtitle: const Text('نمایش نام مخاطب گوشی'),
-                  trailing: const Icon(Icons.chevron_left),
-                  onTap: () => openAppSettings(),
-                ),
-                const Divider(height: 1),
-                ListTile(
-                  leading: const Icon(Icons.notifications_active_rounded, color: Color(0xFFF59E0B)),
-                  title: const Text('اعلان‌ها'),
-                  subtitle: const Text('اعلان تماس و مانیتور فعال'),
-                  trailing: const Icon(Icons.chevron_left),
-                  onTap: () => openAppSettings(),
-                ),
-                const Divider(height: 1),
-                ListTile(
-                  leading: const Icon(Icons.layers_rounded, color: Color(0xFFFF8C3A)),
-                  title: const Text('پاپ‌آپ روی صفحه'),
-                  subtitle: const Text('نمایش روی صفحه تماس (لازم)'),
-                  trailing: const Icon(Icons.chevron_left),
-                  onTap: _openOverlay,
-                ),
+                _row(Icons.phone_in_talk_rounded, const Color(0xFF22C55E), 'تلفن و گزارش تماس', 'خواندن تاریخچه تماس‌ها', () => openAppSettings()),
+                Divider(height: 1, indent: 64, color: AppColors.border),
+                _row(Icons.contacts_rounded, const Color(0xFF8B5CF6), 'نمایش نام مخاطبین گوشی', 'نمایش نام هنگام تماس', () => openAppSettings()),
+                Divider(height: 1, indent: 64, color: AppColors.border),
+                _row(Icons.notifications_active_rounded, const Color(0xFF3B82F6), 'اعلان‌ها', 'اعلان تماس و یادآوری', () => openAppSettings()),
+                Divider(height: 1, indent: 64, color: AppColors.border),
+                _row(Icons.layers_rounded, const Color(0xFFEF4444), 'پاپ‌آپ', 'نمایش روی سایر برنامه‌ها', _openOverlay),
               ],
             ),
           ),
           const SizedBox(height: 16),
-          Text(
-            'هواوی / سامسونگ: در تنظیمات باتری، برای این اپ «بدون محدودیت» و «راه‌اندازی خودکار» را روشن کنید.',
-            style: Theme.of(context).textTheme.bodySmall,
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: AppColors.primary.withOpacity(0.08),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.shield_rounded, color: AppColors.primary),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'برای استفاده کامل، همه مجوزها را فعال کنید. در هواوی/شیائومی: باتری بدون محدودیت + راه‌اندازی خودکار.',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),

@@ -1,3 +1,5 @@
+import 'package:customer_callbook/shared/widgets/jalali_picker.dart';
+import 'package:customer_callbook/services/reminder_service.dart';
 import 'package:customer_callbook/shared/widgets/customer_avatar.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -158,10 +160,11 @@ class _CustomerDetailPageState extends State<CustomerDetailPage> {
         final w = whenFn();
         final u = _customer.copyWith(reminderAt: w);
         await _service.update(u);
+        await ReminderService.instance.schedule(u);
         setState(() => _customer = u);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('یادآوری: ${Jalali.format(w, withTime: true)}')),
+            SnackBar(content: Text('یادآوری و اعلان: ${Jalali.format(w, withTime: true)}')),
           );
         }
       },
@@ -424,28 +427,17 @@ class _CustomerDetailPageState extends State<CustomerDetailPage> {
                 }),
                 ActionChip(
                   avatar: const Icon(Icons.edit_calendar, size: 16),
-                  label: const Text('انتخاب تاریخ و ساعت'),
+                  label: const Text('تاریخ شمسی'),
                   onPressed: () async {
-                    final n = DateTime.now();
-                    final d = await showDatePicker(
-                      context: context,
-                      initialDate: n,
-                      firstDate: n,
-                      lastDate: n.add(const Duration(days: 365)),
-                    );
-                    if (d == null || !mounted) return;
-                    final tm = await showTimePicker(
-                      context: context,
-                      initialTime: TimeOfDay.fromDateTime(n.add(const Duration(hours: 1))),
-                    );
-                    if (tm == null || !mounted) return;
-                    final when = DateTime(d.year, d.month, d.day, tm.hour, tm.minute);
+                    final when = await showJalaliDateTimePicker(context, initial: _customer.reminderAt);
+                    if (when == null || !mounted) return;
                     final u = _customer.copyWith(reminderAt: when);
                     await _service.update(u);
+                    await ReminderService.instance.schedule(u);
                     setState(() => _customer = u);
                     if (mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('یادآوری: ${Jalali.format(when, withTime: true)}')),
+                        SnackBar(content: Text('یادآوری و اعلان: ${Jalali.format(when, withTime: true)}')),
                       );
                     }
                   },
@@ -463,6 +455,7 @@ class _CustomerDetailPageState extends State<CustomerDetailPage> {
                   onPressed: () async {
                     final u = _customer.copyWith(clearReminder: true);
                     await _service.update(u);
+                    await ReminderService.instance.cancel(u);
                     setState(() => _customer = u);
                   },
                 ),

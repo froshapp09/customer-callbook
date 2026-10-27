@@ -35,4 +35,53 @@ class Jalali {
     final jd = 1 + ((days < 186) ? (days % 31) : ((days - 186) % 30));
     return [jy, jm, jd];
   }
+
+
+  static List<int> toJalali(DateTime dt) => _toJalali(dt.year, dt.month, dt.day);
+
+  static int daysInMonth(int jy, int jm) {
+    if (jm <= 6) return 31;
+    if (jm <= 11) return 30;
+    // اسفند: کبیسه تقریبی
+    return _isLeap(jy) ? 30 : 29;
+  }
+
+  static bool _isLeap(int jy) {
+    final breaks = [1, 5, 9, 13, 17, 22, 26, 30];
+    final jp = jy - 979;
+    final jump = jp ~/ 33;
+    final jp2 = jp - jump * 33;
+    for (final b in breaks) {
+      if (jp2 < b) return false;
+      if (jp2 == b) return true;
+    }
+    return false;
+  }
+
+  /// تبدیل شمسی → میلادی
+  static DateTime fromJalali(int jy, int jm, int jd, [int hour = 0, int minute = 0]) {
+    var gy = (jy <= 979) ? 621 : 1600;
+    jy -= (jy <= 979) ? 0 : 979;
+    var days = (365 * jy) + ((jy ~/ 33) * 8) + (((jy % 33) + 3) ~/ 4) + 78 + jd + ((jm < 7) ? (jm - 1) * 31 : ((jm - 7) * 30 + 186));
+    gy += 400 * (days ~/ 146097);
+    days %= 146097;
+    if (days > 36524) {
+      gy += 100 * (--days ~/ 36524);
+      days %= 36524;
+      if (days >= 365) days++;
+    }
+    gy += 4 * (days ~/ 1461);
+    days %= 1461;
+    if (days > 365) {
+      gy += (days - 1) ~/ 365;
+      days = (days - 1) % 365;
+    }
+    var gd = days + 1;
+    final sal_a = [0, 31, ((gy % 4 == 0 && gy % 100 != 0) || (gy % 400 == 0)) ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+    var gm = 0;
+    for (gm = 1; gm <= 12 && gd > sal_a[gm]; gm++) {
+      gd -= sal_a[gm];
+    }
+    return DateTime(gy, gm, gd, hour, minute);
+  }
 }
