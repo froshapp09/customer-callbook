@@ -1,3 +1,4 @@
+import 'package:customer_callbook/features/onboarding/presentation/pages/onboarding_page.dart';
 import 'package:customer_callbook/features/reminders/presentation/pages/reminders_page.dart';
 import 'package:customer_callbook/shared/widgets/customer_avatar.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -33,6 +34,9 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
+  bool _showOnboarding = false;
+  bool _bootChecked = false;
+
   int _tab = 0;
   int _refreshToken = 0;
   final _service = CustomerService();
@@ -42,8 +46,19 @@ class _HomePageState extends State<HomePage> {
   @override
   void initState() {
     super.initState();
+    _checkOnboarding();
     WidgetsBinding.instance.addPostFrameCallback((_) async { await _checkPendingStatus(); await _checkPendingAdd(); });
     _load();
+  }
+
+
+  Future<void> _checkOnboarding() async {
+    final p = await SharedPreferences.getInstance();
+    final done = p.getBool('onboarding_done_v1') ?? false;
+    if (mounted) setState(() {
+      _showOnboarding = !done;
+      _bootChecked = true;
+    });
   }
 
   Future<void> _load() async {
@@ -186,9 +201,18 @@ class _HomePageState extends State<HomePage> {
     } catch (_) {}
   }
 
-  @override
+    @override
   Widget build(BuildContext context) {
-    return Container(
+    if (!_bootChecked) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+    if (_showOnboarding) {
+      return OnboardingPage(onDone: () {
+        setState(() => _showOnboarding = false);
+        _load();
+      });
+    }
+  return Container(
       decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
@@ -572,6 +596,7 @@ class _SettingsTabState extends State<_SettingsTab> {
   @override
   void initState() {
     super.initState();
+    _checkOnboarding();
     _loadPrefs();
   }
 
@@ -653,6 +678,20 @@ class _SettingsTabState extends State<_SettingsTab> {
           _nav(context, Icons.shield_rounded, const Color(0xFF3B82F6), 'مرکز مجوزها',
               'تلفن، گزارش تماس، مخاطبین، اعلان، پاپ‌آپ', () {
             Navigator.push(context, MaterialPageRoute(builder: (_) => const _PermissionsHubPage()));
+          }),
+          _nav(context, Icons.school_rounded, const Color(0xFF10B981), 'آموزش فعال‌سازی',
+              'مجوز تماس، پاپ‌آپ، اعلان و باتری', () async {
+            final done = await Navigator.push<bool>(
+              context,
+              MaterialPageRoute(
+                builder: (_) => OnboardingPage(onDone: () => Navigator.pop(context, true)),
+              ),
+            );
+            if (done == true && mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('تنظیمات فعال‌سازی بررسی شد')),
+              );
+            }
           }),
         ]),
 
@@ -859,6 +898,7 @@ class _CallDetectTileState extends State<_CallDetectTile> {
   @override
   void initState() {
     super.initState();
+    _checkOnboarding();
     CallListenerService.instance.isEnabled().then((v) {
       if (mounted) setState(() => _on = v);
     });
@@ -948,7 +988,18 @@ class _NoteTemplatesPageState extends State<_NoteTemplatesPage> {
   @override
   void initState() {
     super.initState();
+    _checkOnboarding();
     _load();
+  }
+
+
+  Future<void> _checkOnboarding() async {
+    final p = await SharedPreferences.getInstance();
+    final done = p.getBool('onboarding_done_v1') ?? false;
+    if (mounted) setState(() {
+      _showOnboarding = !done;
+      _bootChecked = true;
+    });
   }
 
   Future<void> _load() async {

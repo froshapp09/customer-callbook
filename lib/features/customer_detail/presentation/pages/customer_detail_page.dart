@@ -464,11 +464,22 @@ class _CustomerDetailPageState extends State<CustomerDetailPage> {
             const SizedBox(height: 28),
             Align(
               alignment: Alignment.centerRight,
-              child: Text('سابقه تماس‌ها', style: Theme.of(context).textTheme.titleMedium),
+              child: Text('فعالیت‌های ثبت‌شده', style: Theme.of(context).textTheme.titleMedium),
             ),
+            const SizedBox(height: 6),
+            Text('تماس‌ها و پیگیری‌های این مشتری', style: Theme.of(context).textTheme.bodySmall),
             const SizedBox(height: 10),
             if (_history.isEmpty)
-              Text('سابقه‌ای ثبت نشده', style: Theme.of(context).textTheme.bodySmall)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: AppColors.surfaceElevated,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: AppColors.border),
+                ),
+                child: Text('هنوز فعالیتی ثبت نشده', textAlign: TextAlign.center, style: Theme.of(context).textTheme.bodySmall),
+              )
             else
               ..._history.map((r) {
                 final color = r.type == 1

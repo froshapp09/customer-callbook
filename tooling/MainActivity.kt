@@ -494,13 +494,19 @@ class CallMonitorService : Service() {
             }
             TelephonyManager.CALL_STATE_IDLE -> {
                 if (lastState == TelephonyManager.CALL_STATE_IDLE) return
-                val incoming = wasRinging
                 wasRinging = false
-                val num = lastNumber ?: readLatestNumber()
-                lastNumber = null
-                if (incoming && !num.isNullOrBlank()) {
-                    // بعد از قطع تماس ورودی
-                    handler.postDelayed({ onCallEnded(num) }, 500)
+                // ورودی یا خروجی — اگر شماره در دفترچه نبود پیشنهاد ذخیره
+                var num = lastNumber
+                if (num.isNullOrBlank()) {
+                    // کمی صبر تا لاگ تماس گوشی به‌روز شود
+                    handler.postDelayed({
+                        val n = lastNumber ?: readLatestNumber()
+                        lastNumber = null
+                        if (!n.isNullOrBlank()) onCallEnded(n)
+                    }, 800)
+                } else {
+                    lastNumber = null
+                    handler.postDelayed({ onCallEnded(num!!) }, 500)
                 }
             }
         }
@@ -564,16 +570,17 @@ class CallMonitorService : Service() {
             for (id in 2000..2020) nm.cancel(id)
         } catch (_: Exception) {}
 
+        // ۱) مشتری دفترچه اپ؟
         val c = findCustomer(number)
         if (c != null) {
-            // فقط مشتری دفترچه اپ — نه مخاطب صرف گوشی
             if (isResultPopupEnabled()) {
                 CallOverlayService.show(this, number, c.first, c.third, CallOverlayService.MODE_RESULT)
             }
             return
         }
-        // مخاطب گوشی یا ناشناس بدون دفترچه: نتیجه فروش نشان نده
+        // ۲) فقط مخاطب گوشی → هیچ پاپ‌آپ نتیجه/ذخیره
         if (isInDeviceContacts(number)) return
+        // ۳) کاملاً ناشناس → پیشنهاد ذخیره
         savePending(number, "save")
         CallOverlayService.show(this, number, null, null, CallOverlayService.MODE_SAVE)
     }
@@ -663,11 +670,7 @@ class CallMonitorService : Service() {
             }
         } catch (_: Exception) {
         }
-        // ۲) مخاطبین گوشی
-        val contactName = findDeviceContactName(this, phone)
-        if (!contactName.isNullOrBlank()) {
-            return Triple(contactName, "مخاطب", "از مخاطبین گوشی")
-        }
+        // فقط دفترچه اپ — مخاطب گوشی مشتری اپ نیست
         return null
     }
 
@@ -1085,7 +1088,7 @@ class CallOverlayService : Service() {
         card.addView(sub)
 
         if (!known) {
-            card.addView(makeBtn("افزودن به دفترچه", Color.parseColor("#00C2D8")) {
+            card.addView(makeBtn("ثبت مشتری", Color.parseColor("#00C2D8")) {
                 val i = Intent(this, MainActivity::class.java).apply {
                     action = MainActivity.ACTION_ADD_CUSTOMER
                     putExtra(MainActivity.EXTRA_NUMBER, number)
@@ -1340,7 +1343,7 @@ class CallAlertActivity : Activity() {
 
         if (!known) {
             val addBtn = Button(this).apply {
-                text = "افزودن به دفترچه"
+                text = "ثبت مشتری"
                 setTextColor(Color.WHITE)
                 textSize = 16f
                 isAllCaps = false
@@ -1473,8 +1476,14 @@ class PhoneStateReceiver : BroadcastReceiver() {
                 }
             }
             TelephonyManager.EXTRA_STATE_OFFHOOK -> {
-                // پاسخ داده شد یا تماس خروجی — فقط شماره را نگه دار
-                if (!number.isNullOrBlank()) lastNumber = number
+                // پاسخ یا خروجی
+                if (!number.isNullOrBlank()) {
+                    lastNumber = number
+                } else if (lastNumber.isNullOrBlank()) {
+                    // تماس خروجی — شماره را از آخرین لاگ بگیر
+                    val latest = lastKnownNumber(context)
+                    if (!latest.isNullOrBlank()) lastNumber = latest
+                }
             }
             TelephonyManager.EXTRA_STATE_IDLE -> {
                 val n = when {
@@ -1483,11 +1492,6 @@ class PhoneStateReceiver : BroadcastReceiver() {
                     else -> lastKnownNumber(context)
                 } ?: return
 
-                // فقط بعد از تماس ورودی ناشناس پیشنهاد ذخیره بده (نه تماس خروجی)
-                if (!lastWasIncoming) {
-                    lastNumber = null
-                    return
-                }
                 lastWasIncoming = false
                 lastNumber = null
 
@@ -1496,6 +1500,7 @@ class PhoneStateReceiver : BroadcastReceiver() {
                     val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
                     for (id in 2000..2020) nm.cancel(id)
                 } catch (_: Exception) {}
+                // ورودی یا خروجی: مشتری دفترچه → نتیجه؛ ناشناس → ذخیره
                 val c = findCustomer(context, n)
                 if (c != null) {
                     val prefs = context.getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
@@ -1503,7 +1508,7 @@ class PhoneStateReceiver : BroadcastReceiver() {
                         prefs.getBoolean("flutter.show_result_popup", true) else true
                     if (enabled) openAlert(context, n, c.first, c.third, "result")
                 } else if (isInDeviceContacts(context, n)) {
-                    // مخاطب گوشی — پاپ‌آپ نتیجه نه
+                    // مخاطب گوشی — پیشنهاد ذخیره نه
                 } else {
                     savePending(context, n, MODE_SAVE)
                     openAlert(context, n, null, null, MODE_SAVE)
@@ -1658,10 +1663,7 @@ class PhoneStateReceiver : BroadcastReceiver() {
             }
         } catch (_: Exception) {
         }
-        val contactName = findDeviceContactName(context, phone)
-        if (!contactName.isNullOrBlank()) {
-            return Triple(contactName, "مخاطب", "از مخاطبین گوشی")
-        }
+        // فقط دفترچه اپ
         return null
     }
 
