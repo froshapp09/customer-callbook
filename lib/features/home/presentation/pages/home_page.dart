@@ -964,7 +964,7 @@ class _SettingsTabState extends State<_SettingsTab> {
           _nav(context, Icons.workspace_premium_rounded, const Color(0xFFF59E0B), 'فروشیار پرو',
               LicenseService.isPersonalBuild ? 'نسخه شخصی — بدون سقف' : '۱۰۰ مشتری رایگان · ارتقا یک‌باره', () async {
             final pro = await LicenseService.instance.isPro();
-            final count = customers.length;
+            final count = widget.customers.length;
             final msg = await LicenseService.instance.limitMessage(count);
             if (!context.mounted) return;
             showModalBottomSheet(
