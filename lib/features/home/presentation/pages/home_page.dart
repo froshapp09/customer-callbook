@@ -939,28 +939,6 @@ class _SettingsTabState extends State<_SettingsTab> {
         const SizedBox(height: 18),
         _sectionLabel(context, 'اطلاعات برنامه'),
         _groupCard([
-          _nav(context, Icons.widgets_rounded, const Color(0xFF6366F1), 'ویجت صفحه اصلی',
-              'لمس طولانی صفحه اصلی → ویجت‌ها → فروشیار', () async {
-            await WidgetService.instance.update();
-            if (context.mounted) {
-              showDialog(
-                context: context,
-                builder: (ctx) => AlertDialog(
-                  title: const Text('ویجت صفحه اصلی'),
-                  content: const Text(
-                    '۱) یک‌بار اپ را باز بگذارید تا داده ویجت به‌روز شود.\n'
-                    '۲) روی صفحه اصلی گوشی لمس طولانی کنید.\n'
-                    '۳) «ویجت‌ها» / Widgets را باز کنید.\n'
-                    '۴) «فروشیار» را پیدا کنید و به صفحه بکشید.\n\n'
-                    'اگر در لیست نبود، اپ را یک‌بار Force Stop و دوباره باز کنید.',
-                  ),
-                  actions: [
-                    TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('باشه')),
-                  ],
-                ),
-              );
-            }
-          }),
           _nav(context, Icons.workspace_premium_rounded, const Color(0xFFF59E0B), 'فروشیار پرو',
               LicenseService.isPersonalBuild ? 'نسخه شخصی — بدون سقف' : '۱۰۰ مشتری رایگان · ارتقا یک‌باره', () async {
             final pro = await LicenseService.instance.isPro();

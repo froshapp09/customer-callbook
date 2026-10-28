@@ -1,15 +1,9 @@
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/services.dart';
 
-/// لایسنس / پرداخت درون‌برنامه‌ای
-///
-/// دو خروجی از یک کد:
-/// - personal: بدون سقف (استفاده خودتان)
-/// - store: سقف ۱۰۰ + خرید پرو بازار
-///
-/// بیلد:
-///   flutter build apk --release --dart-define=FOROSHYAR_CHANNEL=personal
-///   flutter build apk --release --dart-define=FOROSHYAR_CHANNEL=store
+/// لایسنس
+/// فعلاً بیلد پیش‌فرض = شخصی بدون محدودیت
+/// بعداً برای بازار: --dart-define=FOROSHYAR_CHANNEL=store
 class LicenseService {
   LicenseService._();
   static final instance = LicenseService._();
@@ -19,7 +13,6 @@ class LicenseService {
   static const _prefPro = 'is_pro';
   static const _channel = MethodChannel('ir.apadanasleep.customer_callbook/bazaar_billing');
 
-  /// personal | store — از --dart-define
   static const channel = String.fromEnvironment(
     'FOROSHYAR_CHANNEL',
     defaultValue: 'personal',
@@ -31,7 +24,6 @@ class LicenseService {
   static const rsaKeyPlaceholder = 'BAZAAR_RSA_KEY_PLACEHOLDER';
 
   Future<bool> isPro() async {
-    // بیلد شخصی همیشه بدون محدودیت
     if (isPersonalBuild) return true;
     final p = await SharedPreferences.getInstance();
     return p.getBool(_prefPro) ?? false;
