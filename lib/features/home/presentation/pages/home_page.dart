@@ -165,26 +165,28 @@ class _HomePageState extends State<HomePage> {
   Future<void> _checkPendingAdd() async {
     try {
       String? n;
+      var callType = 1;
       try {
         const ch = MethodChannel('ir.apadanasleep.customer_callbook/call_log');
         n = await ch.invokeMethod<String>('getPendingAddPhone');
       } catch (_) {}
+      final prefs = await SharedPreferences.getInstance();
       if (n == null || n.isEmpty) {
-        final p = await SharedPreferences.getInstance();
-        n = p.getString('pending_add_phone') ?? p.getString('flutter.pending_add_phone');
-        final typeStr = p.getString('pending_add_call_type') ?? p.getString('flutter.pending_add_call_type') ?? '1';
-        final callType = int.tryParse(typeStr) ?? 1;
-        if (n != null && n.isNotEmpty) {
-          await p.remove('pending_add_phone');
-          await p.remove('pending_add_mode');
-          await p.remove('pending_add_call_type');
-          await p.remove('flutter.pending_add_phone');
-          await p.remove('flutter.pending_add_mode');
-          await p.remove('flutter.pending_add_call_type');
-        }
+        n = prefs.getString('pending_add_phone') ?? prefs.getString('flutter.pending_add_phone');
+      }
+      final typeStr = prefs.getString('pending_add_call_type') ??
+          prefs.getString('flutter.pending_add_call_type') ??
+          '1';
+      callType = int.tryParse(typeStr) ?? 1;
+      if (n != null && n.isNotEmpty) {
+        await prefs.remove('pending_add_phone');
+        await prefs.remove('pending_add_mode');
+        await prefs.remove('pending_add_call_type');
+        await prefs.remove('flutter.pending_add_phone');
+        await prefs.remove('flutter.pending_add_mode');
+        await prefs.remove('flutter.pending_add_call_type');
       }
       if (n == null || n.isEmpty || !mounted) return;
-      // اگر از قبل در دفترچه است، صفحه افزودن باز نشود
       final existing = await _service.findByPhone(n);
       if (existing != null) {
         try {
@@ -195,8 +197,11 @@ class _HomePageState extends State<HomePage> {
       }
       if (!mounted) return;
       await Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => AddCustomerPage(initialPhone: n, fromCall: true, callType: callType)),
+        MaterialPageRoute(
+          builder: (_) => AddCustomerPage(initialPhone: n, fromCall: true, callType: callType),
+        ),
       );
+      _load();
     } catch (_) {}
   }
 
