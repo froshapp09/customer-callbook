@@ -64,6 +64,15 @@ class _AddCustomerPageState extends State<AddCustomerPage> {
     super.dispose();
   }
 
+  Future<void> _recordIfNeeded(String phone, String name) async {
+    // اگر از تماس آمده یا شماره اولیه داشته (پاپ‌آپ ذخیره)
+    final fromCall = widget.fromCall || (widget.initialPhone != null && widget.initialPhone!.trim().isNotEmpty);
+    if (!fromCall) return;
+    try {
+      await _service.recordCall(phone, name: name, type: widget.callType);
+    } catch (_) {}
+  }
+
   Future<void> _clearPending() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -149,6 +158,7 @@ class _AddCustomerPageState extends State<AddCustomerPage> {
             createdAt: existing.createdAt,
           );
           await _service.update(fixed);
+          await _recordIfNeeded(phone, name);
           await _clearPending();
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('مشتری به‌روز شد')));
@@ -166,8 +176,12 @@ class _AddCustomerPageState extends State<AddCustomerPage> {
             reminderAt: _reminderAt,
           );
           final saved = await _service.add(c);
+          await _recordIfNeeded(phone, name);
           await _clearPending();
-          if (mounted) Navigator.pop(context, saved);
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('مشتری و سابقه تماس ذخیره شد')));
+            Navigator.pop(context, saved);
+          }
         }
       }
     } catch (e) {

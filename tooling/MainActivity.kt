@@ -594,7 +594,7 @@ class CallMonitorService : Service() {
         // ۲) فقط مخاطب گوشی → هیچ پاپ‌آپ نتیجه/ذخیره
         if (isInDeviceContacts(number)) return
         // ۳) کاملاً ناشناس → پیشنهاد ذخیره
-        savePending(number, "save")
+        savePending(number, "save", if (lastWasIncoming) "1" else "2")
         CallOverlayService.show(this, number, null, null, CallOverlayService.MODE_SAVE)
     }
 
@@ -635,12 +635,13 @@ class CallMonitorService : Service() {
         }
     }
 
-    private fun savePending(number: String, mode: String) {
+    private fun savePending(number: String, mode: String, callType: String = "1") {
         try {
             getSharedPreferences("FlutterSharedPreferences", MODE_PRIVATE)
                 .edit()
                 .putString("flutter.pending_add_phone", number)
                 .putString("flutter.pending_add_mode", mode)
+                .putString("flutter.pending_add_call_type", callType)
                 .apply()
         } catch (_: Exception) {
         }
@@ -1523,19 +1524,20 @@ class PhoneStateReceiver : BroadcastReceiver() {
                 } else if (isInDeviceContacts(context, n)) {
                     // مخاطب گوشی — پیشنهاد ذخیره نه
                 } else {
-                    savePending(context, n, MODE_SAVE)
+                    savePending(context, n, MODE_SAVE, "1")
                     openAlert(context, n, null, null, MODE_SAVE)
                 }
             }
         }
     }
 
-    private fun savePending(context: Context, number: String, mode: String) {
+    private fun savePending(context: Context, number: String, mode: String, callType: String = "1") {
         try {
             context.getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
                 .edit()
                 .putString("flutter.pending_add_phone", number)
                 .putString("flutter.pending_add_mode", mode)
+                .putString("flutter.pending_add_call_type", callType)
                 .apply()
         } catch (_: Exception) {
         }

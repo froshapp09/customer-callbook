@@ -172,11 +172,15 @@ class _HomePageState extends State<HomePage> {
       if (n == null || n.isEmpty) {
         final p = await SharedPreferences.getInstance();
         n = p.getString('pending_add_phone') ?? p.getString('flutter.pending_add_phone');
-        if (n != null) {
+        final typeStr = p.getString('pending_add_call_type') ?? p.getString('flutter.pending_add_call_type') ?? '1';
+        final callType = int.tryParse(typeStr) ?? 1;
+        if (n != null && n.isNotEmpty) {
           await p.remove('pending_add_phone');
           await p.remove('pending_add_mode');
+          await p.remove('pending_add_call_type');
           await p.remove('flutter.pending_add_phone');
           await p.remove('flutter.pending_add_mode');
+          await p.remove('flutter.pending_add_call_type');
         }
       }
       if (n == null || n.isEmpty || !mounted) return;
@@ -191,7 +195,7 @@ class _HomePageState extends State<HomePage> {
       }
       if (!mounted) return;
       await Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => AddCustomerPage(initialPhone: n)),
+        MaterialPageRoute(builder: (_) => AddCustomerPage(initialPhone: n, fromCall: true, callType: callType)),
       );
     } catch (_) {}
   }
@@ -394,85 +398,57 @@ class _CallsTab extends StatelessWidget {
                 children: [
                   _CallsHeaderClock(),
                   const SizedBox(height: 18),
-                  // امروز زنگ بزن (اصلی) + همگام گوشی (فرعی)
+                  // چهار کارت هم‌اندازه و رنگی
                   Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Expanded(
-                        flex: 3,
-                        child: InkWell(
+                        child: _FeatureTile(
+                          title: 'یادآوری تماس',
+                          subtitle: remindDue == 0 ? 'برای امروز ندارید' : '$remindDue مورد پیگیری',
+                          icon: Icons.alarm_rounded,
+                          color: const Color(0xFFF59E0B),
+                          badge: remindDue > 0 ? '$remindDue' : null,
                           onTap: onReminders,
-                          borderRadius: BorderRadius.circular(18),
-                          child: _GlassCard(
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 4),
-                              child: Row(
-                                children: [
-                                  Container(
-                                    padding: const EdgeInsets.all(12),
-                                    decoration: BoxDecoration(
-                                      color: AppColors.warning.withOpacity(0.15),
-                                      borderRadius: BorderRadius.circular(14),
-                                    ),
-                                    child: Icon(Icons.alarm_rounded, color: AppColors.warning, size: 26),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text('امروز زنگ بزن', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: AppColors.textPrimary)),
-                                        const SizedBox(height: 2),
-                                        Text(
-                                          remindDue == 0 ? 'یادآوری برای امروز ندارید' : '$remindDue مورد برای پیگیری',
-                                          style: Theme.of(context).textTheme.bodySmall,
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  if (remindDue > 0)
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                      decoration: BoxDecoration(
-                                        color: AppColors.danger,
-                                        borderRadius: BorderRadius.circular(12),
-                                      ),
-                                      child: Text('$remindDue', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
-                                    ),
-                                ],
-                              ),
-                            ),
-                          ),
                         ),
                       ),
-                      const SizedBox(width: 10),
+                      const SizedBox(width: 12),
                       Expanded(
-                        flex: 2,
-                        child: InkWell(
+                        child: _FeatureTile(
+                          title: 'همگام‌سازی گوشی',
+                          subtitle: 'تماس‌های گوشی',
+                          icon: Icons.phone_android_rounded,
+                          color: const Color(0xFF6366F1),
                           onTap: onSync,
-                          borderRadius: BorderRadius.circular(18),
-                          child: _GlassCard(
-                            child: Column(
-                              children: [
-                                Icon(Icons.phone_android_rounded, color: AppColors.primary, size: 22),
-                                const SizedBox(height: 6),
-                                Text('همگام گوشی', textAlign: TextAlign.center, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
-                                const SizedBox(height: 2),
-                                Text('تماس‌ها', textAlign: TextAlign.center, style: TextStyle(fontSize: 10, color: AppColors.textMuted)),
-                              ],
-                            ),
-                          ),
                         ),
                       ),
                     ],
                   ),
                   const SizedBox(height: 12),
-                  // آمار فشرده
                   Row(
                     children: [
-                      Expanded(child: _MiniStat(label: 'مشتریان', value: '${customers.length}')),
-                      const SizedBox(width: 8),
-                      Expanded(child: _MiniStat(label: 'تماس امروز', value: '$todayCount')),
+                      Expanded(
+                        child: _FeatureTile(
+                          title: 'مشتریان',
+                          subtitle: '${customers.length} نفر',
+                          icon: Icons.people_alt_rounded,
+                          color: const Color(0xFF8B5CF6),
+                          value: '${customers.length}',
+                          onTap: null,
+                          compact: true,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _FeatureTile(
+                          title: 'تماس امروز',
+                          subtitle: '$todayCount تماس',
+                          icon: Icons.phone_in_talk_rounded,
+                          color: const Color(0xFF10B981),
+                          value: '$todayCount',
+                          onTap: null,
+                          compact: true,
+                        ),
+                      ),
                     ],
                   ),
                   const SizedBox(height: 22),
@@ -565,26 +541,79 @@ class _SliverLoading extends StatelessWidget {
   Widget build(BuildContext context) => SliverFillRemaining(child: Center(child: CircularProgressIndicator(color: AppColors.primary)));
 }
 
-class _MiniStat extends StatelessWidget {
-  final String label;
-  final String value;
-  const _MiniStat({required this.label, required this.value});
+class _FeatureTile extends StatelessWidget {
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final Color color;
+  final String? badge;
+  final String? value;
+  final VoidCallback? onTap;
+  final bool compact;
+
+  const _FeatureTile({
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    required this.color,
+    this.badge,
+    this.value,
+    this.onTap,
+    this.compact = false,
+  });
+
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+    final body = Container(
+      width: double.infinity,
+      constraints: BoxConstraints(minHeight: compact ? 88 : 108),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: AppColors.surfaceElevated,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Row(
-        children: [
-          Text(value, style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18, color: AppColors.primary)),
-          const SizedBox(width: 8),
-          Expanded(child: Text(label, style: Theme.of(context).textTheme.bodySmall)),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: color.withOpacity(0.18)),
+        boxShadow: [
+          BoxShadow(color: color.withOpacity(0.08), blurRadius: 12, offset: const Offset(0, 4)),
         ],
       ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Icon(icon, color: color, size: 22),
+              ),
+              const Spacer(),
+              if (badge != null)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(color: AppColors.danger, borderRadius: BorderRadius.circular(10)),
+                  child: Text(badge!, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 12)),
+                )
+              else if (value != null)
+                Text(value!, style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: color))
+              else
+                Icon(Icons.chevron_left_rounded, color: color.withOpacity(0.5), size: 20),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: AppColors.textPrimary)),
+          const SizedBox(height: 2),
+          Text(subtitle, maxLines: 1, overflow: TextOverflow.ellipsis, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.textMuted)),
+        ],
+      ),
+    );
+    if (onTap == null) return body;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(onTap: onTap, borderRadius: BorderRadius.circular(20), child: body),
     );
   }
 }
