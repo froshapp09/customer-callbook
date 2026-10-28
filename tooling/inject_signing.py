@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Inject release signingConfig into android/app/build.gradle using tooling keystore."""
+"""Force release signing with tooling/release.jks — never leave debug signing."""
 from pathlib import Path
 import re
 import shutil
@@ -25,24 +25,25 @@ def main() -> None:
 
     gradle = APP / "build.gradle"
     if not gradle.exists():
-        # try kts only - write a note
-        if (APP / "build.gradle.kts").exists():
-            raise SystemExit("build.gradle.kts not supported by inject_signing")
-        raise SystemExit("android/app/build.gradle missing")
+        raise SystemExit("android/app/build.gradle missing — run flutter create first")
 
+    # Full controlled rewrite of signing-related parts by appending a clear block
+    # and patching buildTypes / signingConfigs.
     t = gradle.read_text(encoding="utf-8")
 
-    header = """def keystoreProperties = new Properties()
-def keystorePropertiesFile = file("key.properties")
-if (keystorePropertiesFile.exists()) {
-    keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
-}
-
-"""
     if "def keystoreProperties" not in t:
-        t = header + t
+        t = (
+            "def keystoreProperties = new Properties()\n"
+            "def keystorePropertiesFile = file(\"key.properties\")\n"
+            "if (keystorePropertiesFile.exists()) {\n"
+            "    keystoreProperties.load(new FileInputStream(keystorePropertiesFile))\n"
+            "}\n\n"
+        ) + t
 
-    if "signingConfigs {" not in t:
+    # Remove existing signingConfigs / broken buildTypes release debug signing lines
+    t = re.sub(r"signingConfigs\s*\{(?:[^{}]|\{[^{}]*\})*\}", "", t, count=1)
+
+    if "android {" in t and "signingConfigs {" not in t:
         t = t.replace(
             "android {",
             """android {
@@ -50,7 +51,7 @@ if (keystorePropertiesFile.exists()) {
         release {
             keyAlias keystoreProperties['keyAlias']
             keyPassword keystoreProperties['keyPassword']
-            storeFile file(keystoreProperties['storeFile'])
+            storeFile rootProject.file("app/release.jks")
             storePassword keystoreProperties['storePassword']
         }
     }
@@ -58,46 +59,59 @@ if (keystorePropertiesFile.exists()) {
             1,
         )
 
-    # Replace entire buildTypes block to force release signing
-    t2, n = re.subn(
-        r"buildTypes\s*\{(?:[^{}]|\{[^{}]*\})*\}",
-        """buildTypes {
+    # Force buildTypes
+    if re.search(r"buildTypes\s*\{", t):
+        t = re.sub(
+            r"buildTypes\s*\{(?:[^{}]|\{(?:[^{}]|\{[^{}]*\})*\})*\}",
+            """buildTypes {
         release {
             signingConfig signingConfigs.release
             minifyEnabled false
+            shrinkResources false
+            debuggable false
         }
         debug {
             signingConfig signingConfigs.release
+            debuggable false
         }
     }""",
-        t,
-        count=1,
-    )
-    if n:
-        t = t2
+            t,
+            count=1,
+        )
     else:
-        # fallback inject
-        if "signingConfig signingConfigs.release" not in t:
-            t = t.replace(
-                "buildTypes {",
-                """buildTypes {
+        t = t.replace(
+            "android {",
+            """android {
+    buildTypes {
         release {
             signingConfig signingConfigs.release
             minifyEnabled false
+            debuggable false
         }
+    }
 """,
-                1,
-            )
+            1,
+        )
 
     t = re.sub(r"compileSdk\s*=\s*\S+", "compileSdk = 35", t)
     t = re.sub(r"targetSdk\s*=\s*\S+", "targetSdk = 35", t)
     t = t.replace("compileSdk = flutter.compileSdkVersion", "compileSdk = 35")
     t = t.replace("targetSdk = flutter.targetSdkVersion", "targetSdk = 35")
 
+    # Never use signingConfigs.debug
+    t = t.replace("signingConfigs.debug", "signingConfigs.release")
+
     gradle.write_text(t, encoding="utf-8")
-    if "signingConfigs.release" not in t and "signingConfig signingConfigs.release" not in gradle.read_text(encoding="utf-8"):
-        raise SystemExit("failed to inject signingConfigs.release")
-    print("inject_signing OK", gradle)
+    final = gradle.read_text(encoding="utf-8")
+    if "signingConfigs.release" not in final:
+        raise SystemExit("inject_signing failed: no signingConfigs.release")
+    if "signingConfigs.debug" in final and "signingConfig signingConfigs.debug" in final:
+        raise SystemExit("inject_signing failed: still references debug signingConfig")
+    print("inject_signing OK")
+    print("--- signing snippet ---")
+    for i, line in enumerate(final.splitlines(), 1):
+        if "signing" in line.lower() or "buildTypes" in line or "debuggable" in line:
+            print(f"{i}:{line}")
 
 
 if __name__ == "__main__":
