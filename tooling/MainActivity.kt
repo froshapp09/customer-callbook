@@ -383,6 +383,7 @@ class CallMonitorService : Service() {
     private var lastState = TelephonyManager.CALL_STATE_IDLE
     private var lastNumber: String? = null
     private var wasRinging = false
+    private var lastWasIncoming = false
     private val handler = Handler(Looper.getMainLooper())
     private var modernCallback: TelephonyCallback? = null
     private var legacyListener: PhoneStateListener? = null
@@ -482,6 +483,7 @@ class CallMonitorService : Service() {
         when (state) {
             TelephonyManager.CALL_STATE_RINGING -> {
                 wasRinging = true
+                lastWasIncoming = true
                 if (!phoneNumber.isNullOrBlank()) lastNumber = phoneNumber
                 // اگر شماره نبود کمی بعد از لاگ بخوان
                 val num = lastNumber
@@ -498,6 +500,7 @@ class CallMonitorService : Service() {
                 }
             }
             TelephonyManager.CALL_STATE_OFFHOOK -> {
+                if (!wasRinging) lastWasIncoming = false
                 if (!phoneNumber.isNullOrBlank()) lastNumber = phoneNumber
                 // تماس پاسخ داده شد — بنر زنگ را بردار
                 try {
