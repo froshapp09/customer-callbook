@@ -9,7 +9,15 @@ import 'package:customer_callbook/data/services/note_templates_service.dart';
 class AddCustomerPage extends StatefulWidget {
   final Customer? editCustomer;
   final String? initialPhone;
-  const AddCustomerPage({super.key, this.editCustomer, this.initialPhone});
+  final bool fromCall;
+  final int callType;
+  const AddCustomerPage({
+    super.key,
+    this.editCustomer,
+    this.initialPhone,
+    this.fromCall = false,
+    this.callType = 1,
+  });
 
   @override
   State<AddCustomerPage> createState() => _AddCustomerPageState();
@@ -78,8 +86,10 @@ class _AddCustomerPageState extends State<AddCustomerPage> {
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove('pending_add_phone');
       await prefs.remove('pending_add_mode');
+      await prefs.remove('pending_add_call_type');
       await prefs.remove('flutter.pending_add_phone');
       await prefs.remove('flutter.pending_add_mode');
+      await prefs.remove('flutter.pending_add_call_type');
     } catch (_) {}
     try {
       const ch = MethodChannel('ir.apadanasleep.customer_callbook/call_log');
