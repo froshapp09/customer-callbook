@@ -89,6 +89,17 @@ class MainActivity : FlutterActivity() {
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "ir.apadanasleep.customer_callbook/bazaar_billing")
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "purchase", "restore" -> {
+                        // اسکلت: بعد از افزودن Poolakey اینجا وصل شود
+                        result.success(false)
+                    }
+                    else -> result.notImplemented()
+                }
+            }
+
 
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, methodChannelName)
             .setMethodCallHandler { call, result ->

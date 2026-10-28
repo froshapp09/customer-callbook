@@ -95,6 +95,8 @@ if (keystorePropertiesFile.exists()) {
     t = t.replace("targetSdk = flutter.targetSdkVersion", "targetSdk = 35")
 
     gradle.write_text(t, encoding="utf-8")
+    if "signingConfigs.release" not in t and "signingConfig signingConfigs.release" not in gradle.read_text(encoding="utf-8"):
+        raise SystemExit("failed to inject signingConfigs.release")
     print("inject_signing OK", gradle)
 
 

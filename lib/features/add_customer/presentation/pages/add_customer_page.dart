@@ -5,6 +5,7 @@ import 'package:customer_callbook/core/theme/app_colors.dart';
 import 'package:customer_callbook/data/models/customer.dart';
 import 'package:customer_callbook/data/services/customer_service.dart';
 import 'package:customer_callbook/data/services/note_templates_service.dart';
+import 'package:customer_callbook/data/services/license_service.dart';
 
 class AddCustomerPage extends StatefulWidget {
   final Customer? editCustomer;
@@ -116,6 +117,18 @@ class _AddCustomerPageState extends State<AddCustomerPage> {
     }
     setState(() => _saving = true);
     try {
+      if (widget.editCustomer == null) {
+        final count = (await _service.getAll()).length;
+        final existing = await _service.findByPhone(phone);
+        if (existing == null && !await LicenseService.instance.canAddCustomer(count)) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('سقف رایگان ۱۰۰ مشتری پر شد. نسخه پرو را فعال کنید.')),
+            );
+          }
+          return;
+        }
+      }
       if (widget.editCustomer != null) {
         final updated = widget.editCustomer!.copyWith(
           name: name,

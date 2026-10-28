@@ -1,3 +1,5 @@
+import 'package:customer_callbook/data/services/license_service.dart';
+import 'package:customer_callbook/data/services/license_service.dart';
 import 'package:customer_callbook/features/onboarding/presentation/pages/onboarding_page.dart';
 import 'package:customer_callbook/features/reminders/presentation/pages/reminders_page.dart';
 import 'package:customer_callbook/shared/widgets/customer_avatar.dart';
@@ -959,6 +961,57 @@ class _SettingsTabState extends State<_SettingsTab> {
               );
             }
           }),
+          _nav(context, Icons.workspace_premium_rounded, const Color(0xFFF59E0B), 'فروشیار پرو',
+              LicenseService.isPersonalBuild ? 'نسخه شخصی — بدون سقف' : '۱۰۰ مشتری رایگان · ارتقا یک‌باره', () async {
+            final pro = await LicenseService.instance.isPro();
+            final count = customers.length;
+            final msg = await LicenseService.instance.limitMessage(count);
+            if (!context.mounted) return;
+            showModalBottomSheet(
+              context: context,
+              shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+              builder: (ctx) => Padding(
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(pro ? 'نسخه پرو فعال است' : 'ارتقا به فروشیار پرو',
+                        textAlign: TextAlign.center, style: Theme.of(ctx).textTheme.titleMedium),
+                    const SizedBox(height: 8),
+                    Text(msg, textAlign: TextAlign.center),
+                    const SizedBox(height: 6),
+                    const Text('سقف رایگان ۱۰۰ مشتری — سپس خرید یک‌باره پرو',
+                        textAlign: TextAlign.center, style: TextStyle(fontSize: 12)),
+                    const SizedBox(height: 16),
+                    if (!pro) ...[
+                      ElevatedButton(
+                        onPressed: () async {
+                          final ok = await LicenseService.instance.purchasePro();
+                          if (ctx.mounted) {
+                            Navigator.pop(ctx);
+                            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                              content: Text(ok
+                                  ? 'پرو فعال شد'
+                                  : 'اتصال بازار بعد از قرار دادن RSA در پنل کامل می‌شود'),
+                            ));
+                          }
+                        },
+                        child: const Text('خرید پرو (بازار)'),
+                      ),
+                      TextButton(
+                        onPressed: () async {
+                          await LicenseService.instance.restorePurchases();
+                          if (ctx.mounted) Navigator.pop(ctx);
+                        },
+                        child: const Text('بازیابی خرید'),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            );
+          }),
           _nav(context, Icons.info_rounded, AppColors.textMuted, 'درباره برنامه',
               'نسخه و پشتیبانی', () {
             Navigator.push(context, MaterialPageRoute(builder: (_) => const _AboutPage()));
@@ -1439,7 +1492,7 @@ class _AboutPage extends StatelessWidget {
           const SizedBox(height: 16),
           Text('فروشیار', textAlign: TextAlign.center, style: Theme.of(context).textTheme.headlineMedium),
           const SizedBox(height: 8),
-          Text('نسخه ۱.۳۶.۰', textAlign: TextAlign.center, style: Theme.of(context).textTheme.bodyMedium),
+          Text('نسخه ۱.۳۸.۳ · ${LicenseService.isPersonalBuild ? 'شخصی' : 'بازار'}', textAlign: TextAlign.center, style: Theme.of(context).textTheme.bodyMedium),
           const SizedBox(height: 24),
           ListTile(
             leading: Icon(Icons.email_outlined, color: AppColors.primary),

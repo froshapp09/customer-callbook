@@ -368,33 +368,62 @@ class _CustomerDetailPageState extends State<CustomerDetailPage> {
               child: Text('اطلاعات پایه', style: Theme.of(context).textTheme.titleMedium),
             ),
             const SizedBox(height: 10),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-              decoration: BoxDecoration(
-                color: AppColors.surfaceElevated,
-                borderRadius: BorderRadius.circular(18),
-                border: Border.all(color: AppColors.border),
-              ),
-              child: Column(
-                children: [
-                  _infoRow(Icons.phone_android_rounded, 'شماره', Customer.normalizePhone(_customer.phone), ltr: true),
-                  Divider(height: 1, color: AppColors.border),
-                  _infoRow(Icons.label_rounded, 'دسته', _customer.tag.isEmpty ? '—' : _customer.tag),
-                  Divider(height: 1, color: AppColors.border),
-                  _infoRow(Icons.flag_rounded, 'وضعیت', _customer.status),
-                  Divider(height: 1, color: AppColors.border),
-                  _infoRow(Icons.event_rounded, 'تاریخ ثبت', Jalali.format(_customer.createdAt)),
-                ],
-              ),
+            Row(
+              children: [
+                Expanded(
+                  child: _ColorInfoTile(
+                    icon: Icons.phone_rounded,
+                    color: const Color(0xFF6366F1),
+                    label: 'شماره',
+                    value: Customer.normalizePhone(_customer.phone),
+                    ltr: true,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: _ColorInfoTile(
+                    icon: Icons.label_rounded,
+                    color: const Color(0xFF8B5CF6),
+                    label: 'دسته',
+                    value: _customer.tag.isEmpty ? '—' : _customer.tag,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: _ColorInfoTile(
+                    icon: Icons.flag_rounded,
+                    color: Color(CustomerStatus.colorValue(_customer.status)),
+                    label: 'وضعیت',
+                    value: CustomerStatus.normalize(_customer.status),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: _ColorInfoTile(
+                    icon: Icons.event_rounded,
+                    color: const Color(0xFF10B981),
+                    label: 'تاریخ ثبت',
+                    value: Jalali.format(_customer.createdAt),
+                  ),
+                ),
+              ],
             ),
 Align(
               alignment: Alignment.centerRight,
               child: Text('وضعیت فروش', style: Theme.of(context).textTheme.titleMedium),
             ),
             const SizedBox(height: 10),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
+            GridView.count(
+              crossAxisCount: 2,
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              mainAxisSpacing: 10,
+              crossAxisSpacing: 10,
+              childAspectRatio: 2.8,
               children: CustomerStatus.all.map((s) {
                 final selected = CustomerStatus.normalize(_customer.status) == s;
                 final c = Color(CustomerStatus.colorValue(s));
@@ -404,24 +433,27 @@ Align(
                     await _service.update(u);
                     setState(() => _customer = u);
                   },
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(14),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    alignment: Alignment.center,
                     decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: selected ? c : AppColors.border, width: selected ? 1.5 : 1),
-                      color: selected ? c.withOpacity(0.12) : AppColors.surfaceElevated,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: selected ? c : AppColors.border, width: selected ? 1.6 : 1),
+                      color: selected ? c.withOpacity(0.14) : AppColors.surfaceElevated,
                     ),
                     child: Row(
-                      mainAxisSize: MainAxisSize.min,
+                      mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Container(
-                          width: 10,
-                          height: 10,
-                          decoration: BoxDecoration(color: c, shape: BoxShape.circle),
-                        ),
+                        Container(width: 10, height: 10, decoration: BoxDecoration(color: c, shape: BoxShape.circle)),
                         const SizedBox(width: 8),
-                        Text(s, style: TextStyle(fontWeight: selected ? FontWeight.w700 : FontWeight.w500, color: selected ? c : AppColors.textPrimary, fontSize: 13)),
+                        Flexible(
+                          child: Text(
+                            s,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(fontWeight: FontWeight.w700, color: selected ? c : AppColors.textPrimary, fontSize: 12.5),
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -736,6 +768,54 @@ class _InfoCol extends StatelessWidget {
         const SizedBox(height: 4),
         Text(title, style: Theme.of(context).textTheme.bodySmall, textAlign: TextAlign.center, maxLines: 1),
       ],
+    );
+  }
+}
+
+
+class _ColorInfoTile extends StatelessWidget {
+  final IconData icon;
+  final Color color;
+  final String label;
+  final String value;
+  final bool ltr;
+  const _ColorInfoTile({
+    required this.icon,
+    required this.color,
+    required this.label,
+    required this.value,
+    this.ltr = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: color.withOpacity(0.22)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, size: 16, color: color),
+              const SizedBox(width: 6),
+              Text(label, style: TextStyle(fontSize: 11, color: color, fontWeight: FontWeight.w600)),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            textDirection: ltr ? TextDirection.ltr : TextDirection.rtl,
+            style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: AppColors.textPrimary),
+          ),
+        ],
+      ),
     );
   }
 }
