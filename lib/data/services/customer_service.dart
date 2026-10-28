@@ -225,6 +225,7 @@ class CustomerService {
     int type = 2,
     int durationSec = 0,
     DateTime? at,
+    String? resultStatus,
   }) async {
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getString(_callsKey);

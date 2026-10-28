@@ -3,23 +3,38 @@ import 'package:customer_callbook/core/utils/text_repair.dart';
 
 /// وضعیت فروش تلفنی
 class CustomerStatus {
-  static const neu = 'جدید';
+  static const tracking = 'در حال پیگیری';
   static const negotiating = 'در حال مذاکره';
-  static const purchased = 'خرید کرده';
-  static const noAnswer = 'بی‌پاسخ';
-  static const all = [neu, negotiating, purchased, noAnswer];
+  static const success = 'موفق';
+  static const lost = 'از دست رفته';
+  static const neu = tracking;
+  static const purchased = success;
+  static const noAnswer = lost;
+  static const all = [tracking, negotiating, success, lost];
 
   static int colorValue(String s) {
-    switch (s) {
+    switch (normalize(s)) {
+      case success:
+        return 0xFF22C55E;
       case negotiating:
-        return 0xFFD97706;
-      case purchased:
-        return 0xFF16A34A;
-      case noAnswer:
-        return 0xFFDC2626;
+        return 0xFF8B5CF6;
+      case tracking:
+        return 0xFFF59E0B;
+      case lost:
+        return 0xFFEF4444;
       default:
-        return 0xFF6C63FF;
+        return 0xFF6366F1;
     }
+  }
+
+  static String normalize(String? raw) {
+    final s = (raw ?? '').trim();
+    if (s.isEmpty) return tracking;
+    if (s == 'جدید' || s == 'پیگیری') return tracking;
+    if (s == 'خرید کرده' || s == 'خرید') return success;
+    if (s == 'بی‌پاسخ') return lost;
+    if (all.contains(s)) return s;
+    return tracking;
   }
 }
 
