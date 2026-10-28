@@ -141,6 +141,21 @@ class _CustomerDetailPageState extends State<CustomerDetailPage> {
     }
   }
 
+  Color _statusColor(String s) {
+    switch (CustomerStatus.normalize(s)) {
+      case CustomerStatus.success:
+        return const Color(0xFF22C55E);
+      case CustomerStatus.negotiating:
+        return const Color(0xFF8B5CF6);
+      case CustomerStatus.tracking:
+        return const Color(0xFFF59E0B);
+      case CustomerStatus.lost:
+        return const Color(0xFFEF4444);
+      default:
+        return AppColors.primary;
+    }
+  }
+
   String _fmt(DateTime? dt) {
     if (dt == null) return '—';
     return Jalali.format(dt, withTime: false);
@@ -381,21 +396,35 @@ Align(
               spacing: 8,
               runSpacing: 8,
               children: CustomerStatus.all.map((s) {
-                final selected = _customer.status == s;
+                final selected = CustomerStatus.normalize(_customer.status) == s;
                 final c = Color(CustomerStatus.colorValue(s));
-                return ChoiceChip(
-                  label: Text(s),
-                  selected: selected,
-                  selectedColor: c.withOpacity(0.2),
-                  labelStyle: TextStyle(
-                    color: selected ? c : AppColors.textSecondary,
-                    fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                  ),
-                  onSelected: (_) async {
+                return InkWell(
+                  onTap: () async {
                     final u = _customer.copyWith(status: s);
                     await _service.update(u);
                     setState(() => _customer = u);
                   },
+                  borderRadius: BorderRadius.circular(12),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: selected ? c : AppColors.border, width: selected ? 1.5 : 1),
+                      color: selected ? c.withOpacity(0.12) : AppColors.surfaceElevated,
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 10,
+                          height: 10,
+                          decoration: BoxDecoration(color: c, shape: BoxShape.circle),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(s, style: TextStyle(fontWeight: selected ? FontWeight.w700 : FontWeight.w500, color: selected ? c : AppColors.textPrimary, fontSize: 13)),
+                      ],
+                    ),
+                  ),
                 );
               }).toList(),
             ),
@@ -617,12 +646,17 @@ Align(
                                 decoration: BoxDecoration(color: AppColors.primary.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
                                 child: Text('دسته: ${_customer.tag}', style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.w600, fontSize: 12)),
                               ),
-                            if (_customer.status.isNotEmpty)
-                              Container(
+                            Builder(builder: (_) {
+                              final st = (r.resultStatus != null && r.resultStatus!.isNotEmpty)
+                                  ? r.resultStatus!
+                                  : _customer.status;
+                              final col = _statusColor(st);
+                              return Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                decoration: BoxDecoration(color: AppColors.info.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
-                                child: Text(_customer.status, style: TextStyle(color: AppColors.info, fontWeight: FontWeight.w600, fontSize: 12)),
-                              ),
+                                decoration: BoxDecoration(color: col.withOpacity(0.12), borderRadius: BorderRadius.circular(8)),
+                                child: Text(st, style: TextStyle(color: col, fontWeight: FontWeight.w600, fontSize: 12)),
+                              );
+                            }),
                           ],
                         ),
                         if (_customer.note != null && _customer.note!.trim().isNotEmpty) ...[

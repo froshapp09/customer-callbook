@@ -972,9 +972,10 @@ class CallOverlayService : Service() {
                 stopSelf()
             })
         }
-        statusBtn("بی‌پاسخ", "بی‌پاسخ", Color.parseColor("#DC2626"))
-        statusBtn("در حال مذاکره", "در حال مذاکره", Color.parseColor("#D97706"))
-        statusBtn("خرید کرده", "خرید کرده", Color.parseColor("#16A34A"))
+        statusBtn("در حال پیگیری", "در حال پیگیری", Color.parseColor("#F59E0B"))
+        statusBtn("در حال مذاکره", "در حال مذاکره", Color.parseColor("#8B5CF6"))
+        statusBtn("موفق", "موفق", Color.parseColor("#22C55E"))
+        statusBtn("از دست رفته", "از دست رفته", Color.parseColor("#EF4444"))
         card.addView(makeBtn("نادیده گرفتن", Color.parseColor("#2A3142"), Color.parseColor("#B0B8C8")) {
             remove()
             stopSelf()

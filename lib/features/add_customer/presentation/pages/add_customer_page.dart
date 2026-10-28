@@ -31,7 +31,7 @@ class _AddCustomerPageState extends State<AddCustomerPage> {
   final _amount = TextEditingController();
   final _service = CustomerService();
   String _tag = 'مشتری';
-  String _status = CustomerStatus.neu;
+  String _status = CustomerStatus.tracking;
   DateTime? _reminderAt;
   bool _saving = false;
   List<String> _templates = [];

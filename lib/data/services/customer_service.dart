@@ -250,6 +250,7 @@ class CustomerService {
       type: type,
       at: when,
       durationSec: durationSec,
+      resultStatus: resultStatus,
     );
     list.insert(0, rec.toJson());
     // cap storage for battery/storage
@@ -344,4 +345,48 @@ class CustomerService {
     if (changed) await _save(out);
   }
 
+
+  Future<void> updateLatestCallStatus(String phone, String status) async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_callsKey);
+    if (raw == null || raw.isEmpty) return;
+    final list = (jsonDecode(raw) as List)
+        .map((e) => CallRecord.fromJson(Map<String, dynamic>.from(e)))
+        .toList();
+    final key = Customer.matchKey(phone);
+    for (var i = 0; i < list.length; i++) {
+      if (Customer.matchKey(list[i].phone) == key) {
+        final r = list[i];
+        list[i] = CallRecord(
+          id: r.id,
+          phone: r.phone,
+          customerId: r.customerId,
+          type: r.type,
+          at: r.at,
+          durationSec: r.durationSec,
+          resultStatus: status,
+        );
+        break;
+      }
+    }
+    await prefs.setString(_callsKey, jsonEncode(list.map((e) => e.toJson()).toList()));
+  }
+
+  Future<Map<String, int>> todayCallBreakdown() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_callsKey);
+    var inC = 0, outC = 0, miss = 0;
+    if (raw != null && raw.isNotEmpty) {
+      final now = DateTime.now();
+      for (final e in (jsonDecode(raw) as List)) {
+        final r = CallRecord.fromJson(Map<String, dynamic>.from(e));
+        if (r.at.year == now.year && r.at.month == now.month && r.at.day == now.day) {
+          if (r.type == 1) inC++;
+          else if (r.type == 3) miss++;
+          else outC++;
+        }
+      }
+    }
+    return {'in': inC, 'out': outC, 'miss': miss, 'total': inC + outC + miss};
+  }
 }

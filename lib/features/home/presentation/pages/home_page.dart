@@ -152,10 +152,12 @@ class _HomePageState extends State<HomePage> {
       if (phone == null || status == null || phone.isEmpty) return;
       final c = await _service.findByPhone(phone);
       if (c == null) return;
-      await _service.update(c.copyWith(status: status));
+      final normalized = CustomerStatus.normalize(status);
+      await _service.update(c.copyWith(status: normalized));
+      await _service.updateLatestCallStatus(phone, normalized);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('وضعیت «${c.name}» → $status')),
+          SnackBar(content: Text('وضعیت «${c.name}» → $normalized')),
         );
         _load();
       }
@@ -419,8 +421,8 @@ class _CallsTab extends StatelessWidget {
                       const SizedBox(width: 12),
                       Expanded(
                         child: _FeatureTile(
-                          title: 'همگام‌سازی گوشی',
-                          subtitle: 'تماس‌های گوشی',
+                          title: 'همگام گوشی',
+                          subtitle: 'دریافت از گوشی',
                           icon: Icons.phone_android_rounded,
                           color: const Color(0xFF6366F1),
                           onTap: onSync,
@@ -609,9 +611,9 @@ class _FeatureTile extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 12),
-          Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: AppColors.textPrimary)),
+          Text(title, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, height: 1.2, color: AppColors.textPrimary)),
           const SizedBox(height: 2),
-          Text(subtitle, maxLines: 1, overflow: TextOverflow.ellipsis, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.textMuted)),
+          Text(subtitle, maxLines: 1, overflow: TextOverflow.ellipsis, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.textMuted, fontSize: 11)),
         ],
       ),
     );

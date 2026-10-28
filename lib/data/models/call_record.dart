@@ -5,6 +5,7 @@ class CallRecord {
   final int type; // 1 in, 2 out, 3 missed
   final DateTime at;
   final int durationSec;
+  final String? resultStatus; // وضعیت انتخاب‌شده بعد تماس
 
   CallRecord({
     required this.id,
@@ -13,6 +14,7 @@ class CallRecord {
     required this.type,
     required this.at,
     this.durationSec = 0,
+    this.resultStatus,
   });
 
   Map<String, dynamic> toJson() => {
@@ -22,6 +24,7 @@ class CallRecord {
         'type': type,
         'at': at.toIso8601String(),
         'durationSec': durationSec,
+        'resultStatus': resultStatus,
       };
 
   factory CallRecord.fromJson(Map<String, dynamic> j) => CallRecord(
@@ -31,6 +34,7 @@ class CallRecord {
         type: j['type'] as int? ?? 1,
         at: DateTime.tryParse(j['at'] as String? ?? '') ?? DateTime.now(),
         durationSec: j['durationSec'] as int? ?? 0,
+        resultStatus: j['resultStatus'] as String?,
       );
 
   String get typeLabel {
