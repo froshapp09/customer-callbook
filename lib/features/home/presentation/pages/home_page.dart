@@ -819,73 +819,52 @@ class _SettingsTabState extends State<_SettingsTab> {
         ),
         const SizedBox(height: 18),
 
-        // کارت شناسایی
-        const _CallDetectTile(),
-        const SizedBox(height: 10),
-        // سوییچ پاپ‌آپ نتیجه
+        // پاپ‌آپ نتیجه — فشرده
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
           decoration: BoxDecoration(
             color: AppColors.surfaceElevated,
-            borderRadius: BorderRadius.circular(18),
+            borderRadius: BorderRadius.circular(16),
             border: Border.all(color: AppColors.border),
           ),
           child: SwitchListTile(
-            contentPadding: EdgeInsets.zero,
-            title: const Text('پاپ‌آپ نتیجه تماس', style: TextStyle(fontWeight: FontWeight.w700)),
-            subtitle: const Text('بعد از قطع تماس برای مشتری ثبت‌شده'),
+            dense: true,
+            contentPadding: const EdgeInsets.symmetric(horizontal: 4),
+            title: const Text('پاپ‌آپ نتیجه تماس', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+            subtitle: Text(
+              _resultPopup ? 'فعال — بعد از قطع تماس' : 'خاموش',
+              style: TextStyle(fontSize: 12, color: _resultPopup ? AppColors.accent : AppColors.textMuted),
+            ),
             value: _resultPopup,
             activeColor: AppColors.primary,
-            onChanged: _setResultPopup,
-            secondary: Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: const Color(0xFF8B5CF6).withOpacity(0.12),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: const Icon(Icons.fact_check_rounded, color: Color(0xFF8B5CF6)),
-            ),
+            onChanged: (v) async {
+              await _setResultPopup(v);
+              if (mounted) setState(() {});
+            },
           ),
         ),
+        const SizedBox(height: 10),
+        const _CallDetectTile(),
 
-        const SizedBox(height: 22),
+        const SizedBox(height: 20),
         _sectionLabel(context, 'مجوزها'),
         _groupCard([
           _nav(context, Icons.shield_rounded, const Color(0xFF3B82F6), 'مرکز مجوزها',
-              'تلفن، گزارش تماس، مخاطبین، اعلان، پاپ‌آپ', () {
+              'مجوزها + آموزش فعال‌سازی', () {
             Navigator.push(context, MaterialPageRoute(builder: (_) => const _PermissionsHubPage()));
-          }),
-          _nav(context, Icons.school_rounded, const Color(0xFF10B981), 'آموزش فعال‌سازی',
-              'مجوز تماس، پاپ‌آپ، اعلان و باتری', () async {
-            final done = await Navigator.push<bool>(
-              context,
-              MaterialPageRoute(
-                builder: (_) => OnboardingPage(onDone: () => Navigator.pop(context, true)),
-              ),
-            );
-            if (done == true && mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('تنظیمات فعال‌سازی بررسی شد')),
-              );
-            }
           }),
         ]),
 
         const SizedBox(height: 18),
-        _sectionLabel(context, 'تماس‌های گوشی'),
+        _sectionLabel(context, 'تنظیمات اپ'),
         _groupCard([
           _nav(context, Icons.phone_android_rounded, AppColors.primary, 'تماس‌های گوشی',
               'دریافت تاریخچه و افزودن به مشتریان', () async {
             await Navigator.push(context, MaterialPageRoute(builder: (_) => const CallSyncPage()));
             widget.onReload();
           }),
-        ]),
-
-        const SizedBox(height: 18),
-        _sectionLabel(context, 'مخاطبین و دسته‌بندی'),
-        _groupCard([
           _nav(context, Icons.palette_rounded, AppColors.warning, 'رنگ دسته‌بندی‌ها',
-              'تنظیم رنگ گروه‌های مشتریان', () {
+              'رنگ گروه‌های مشتریان', () {
             Navigator.push(context, MaterialPageRoute(builder: (_) => const _TagColorPage()));
           }),
           _nav(context, Icons.sticky_note_2_rounded, const Color(0xFF38BDF8), 'یادداشت آماده',
@@ -895,10 +874,10 @@ class _SettingsTabState extends State<_SettingsTab> {
         ]),
 
         const SizedBox(height: 18),
-        _sectionLabel(context, 'امکانات کاربردی'),
+        _sectionLabel(context, 'امکانات'),
         _groupCard([
           _nav(context, Icons.event_note_rounded, const Color(0xFF10B981), 'امروز زنگ بزن',
-              'یادآوری تماس امروز و روزهای آینده', () {
+              'یادآوری تماس امروز و آینده', () {
             Navigator.push(context, MaterialPageRoute(builder: (_) => const RemindersPage()));
           }),
           _nav(context, Icons.insights_rounded, const Color(0xFF8B5CF6), 'گزارش هفتگی',
@@ -909,11 +888,6 @@ class _SettingsTabState extends State<_SettingsTab> {
               'ذخیره و بازیابی بعد از نصب مجدد', () {
             Navigator.push(context, MaterialPageRoute(builder: (_) => _BackupPage(onDone: widget.onReload)));
           }),
-        ]),
-
-        const SizedBox(height: 18),
-        _sectionLabel(context, 'فایل و داده‌ها'),
-        _groupCard([
           _nav(context, Icons.upload_file_rounded, const Color(0xFFA78BFA), 'خروجی لیست مشتریان',
               'ذخیره CSV در پوشه دانلود', () async {
             try {
@@ -939,57 +913,6 @@ class _SettingsTabState extends State<_SettingsTab> {
         const SizedBox(height: 18),
         _sectionLabel(context, 'اطلاعات برنامه'),
         _groupCard([
-          _nav(context, Icons.workspace_premium_rounded, const Color(0xFFF59E0B), 'فروشیار پرو',
-              LicenseService.isPersonalBuild ? 'نسخه شخصی — بدون سقف' : '۱۰۰ مشتری رایگان · ارتقا یک‌باره', () async {
-            final pro = await LicenseService.instance.isPro();
-            final count = widget.customers.length;
-            final msg = await LicenseService.instance.limitMessage(count);
-            if (!context.mounted) return;
-            showModalBottomSheet(
-              context: context,
-              shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-              builder: (ctx) => Padding(
-                padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Text(pro ? 'نسخه پرو فعال است' : 'ارتقا به فروشیار پرو',
-                        textAlign: TextAlign.center, style: Theme.of(ctx).textTheme.titleMedium),
-                    const SizedBox(height: 8),
-                    Text(msg, textAlign: TextAlign.center),
-                    const SizedBox(height: 6),
-                    const Text('سقف رایگان ۱۰۰ مشتری — سپس خرید یک‌باره پرو',
-                        textAlign: TextAlign.center, style: TextStyle(fontSize: 12)),
-                    const SizedBox(height: 16),
-                    if (!pro) ...[
-                      ElevatedButton(
-                        onPressed: () async {
-                          final ok = await LicenseService.instance.purchasePro();
-                          if (ctx.mounted) {
-                            Navigator.pop(ctx);
-                            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                              content: Text(ok
-                                  ? 'پرو فعال شد'
-                                  : 'اتصال بازار بعد از قرار دادن RSA در پنل کامل می‌شود'),
-                            ));
-                          }
-                        },
-                        child: const Text('خرید پرو (بازار)'),
-                      ),
-                      TextButton(
-                        onPressed: () async {
-                          await LicenseService.instance.restorePurchases();
-                          if (ctx.mounted) Navigator.pop(ctx);
-                        },
-                        child: const Text('بازیابی خرید'),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-            );
-          }),
           _nav(context, Icons.info_rounded, AppColors.textMuted, 'درباره برنامه',
               'نسخه و پشتیبانی', () {
             Navigator.push(context, MaterialPageRoute(builder: (_) => const _AboutPage()));
@@ -1578,6 +1501,22 @@ class _PermissionsHubPage extends StatelessWidget {
                   ),
                 ),
               ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: () async {
+                await Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => OnboardingPage(onDone: () => Navigator.pop(context)),
+                  ),
+                );
+              },
+              icon: const Icon(Icons.school_rounded),
+              label: const Text('آموزش فعال‌سازی گام‌به‌گام'),
             ),
           ),
         ],
