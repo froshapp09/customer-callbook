@@ -81,9 +81,13 @@ jobs:
       - name: Widget resources
         run: |
           set -e
-          python3 tooling/ensure_widget.py || true
           mkdir -p android/app/src/main/res/xml android/app/src/main/res/values
-          python3 tooling/ensure_widget.py
+          python3 tooling/ensure_widget.py || true
+          rm -f android/app/src/main/res/values/widget_strings.xml
+          # if tooling copied duplicates, keep only strings.xml
+          if [ -f android/app/src/main/res/values/strings.xml ]; then
+            rm -f android/app/src/main/res/values/widget_strings.xml
+          fi
 
       - name: pub get + manifest
         run: |
