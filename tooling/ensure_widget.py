@@ -6,6 +6,9 @@ import re
 RES = Path("android/app/src/main/res")
 MAN = Path("android/app/src/main/AndroidManifest.xml")
 
+# avoid duplicate string resources
+(RES / "values" / "widget_strings.xml").unlink(missing_ok=True)
+
 
 def write(sub: str, name: str, content: str) -> None:
     p = RES / sub / name
