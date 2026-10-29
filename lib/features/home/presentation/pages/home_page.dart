@@ -35,7 +35,7 @@ class HomePage extends StatefulWidget {
   State<HomePage> createState() => _HomePageState();
 }
 
-class _HomePageState extends State<HomePage> {
+class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   bool _showOnboarding = false;
   bool _bootChecked = false;
   int _remindDue = 0;
@@ -49,9 +49,27 @@ class _HomePageState extends State<HomePage> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _checkOnboarding();
-    WidgetsBinding.instance.addPostFrameCallback((_) async { await _checkPendingStatus(); await _checkPendingAdd(); });
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await _checkPendingStatus();
+      await _checkPendingAdd();
+    });
     _load();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _checkPendingStatus();
+      _checkPendingAdd();
+    }
   }
 
 
@@ -166,47 +184,61 @@ class _HomePageState extends State<HomePage> {
     } catch (_) {}
   }
 
+  bool _openingAdd = false;
+
   Future<void> _checkPendingAdd() async {
+    if (_openingAdd || !mounted) return;
     try {
       String? n;
       var callType = 1;
-      try {
-        const ch = MethodChannel('ir.apadanasleep.customer_callbook/call_log');
-        n = await ch.invokeMethod<String>('getPendingAddPhone');
-      } catch (_) {}
+      const ch = MethodChannel('ir.apadanasleep.customer_callbook/call_log');
       final prefs = await SharedPreferences.getInstance();
-      if (n == null || n.isEmpty) {
-        n = prefs.getString('pending_add_phone') ?? prefs.getString('flutter.pending_add_phone');
+
+      // چندبار تلاش: ممکن است هنوز prefs/intent نرسیده باشد
+      for (var i = 0; i < 5; i++) {
+        try {
+          n = await ch.invokeMethod<String>('getPendingAddPhone');
+        } catch (_) {}
+        if (n == null || n.isEmpty) {
+          n = prefs.getString('pending_add_phone') ?? prefs.getString('flutter.pending_add_phone');
+        }
+        if (n != null && n.trim().isNotEmpty) break;
+        await Future.delayed(Duration(milliseconds: 250 + i * 150));
       }
+      if (n == null || n.trim().isEmpty) return;
+
       final typeStr = prefs.getString('pending_add_call_type') ??
           prefs.getString('flutter.pending_add_call_type') ??
           '1';
       callType = int.tryParse(typeStr) ?? 1;
-      if (n != null && n.isNotEmpty) {
-        await prefs.remove('pending_add_phone');
-        await prefs.remove('pending_add_mode');
-        await prefs.remove('pending_add_call_type');
-        await prefs.remove('flutter.pending_add_phone');
-        await prefs.remove('flutter.pending_add_mode');
-        await prefs.remove('flutter.pending_add_call_type');
-      }
-      if (n == null || n.isEmpty || !mounted) return;
-      final existing = await _service.findByPhone(n);
-      if (existing != null) {
-        try {
-          const ch = MethodChannel('ir.apadanasleep.customer_callbook/call_log');
-          await ch.invokeMethod('clearPendingAddPhone');
-        } catch (_) {}
+
+      _openingAdd = true;
+      // پاک کردن بعد از اینکه شماره را گرفتیم
+      await prefs.remove('pending_add_phone');
+      await prefs.remove('pending_add_mode');
+      await prefs.remove('pending_add_call_type');
+      await prefs.remove('flutter.pending_add_phone');
+      await prefs.remove('flutter.pending_add_mode');
+      await prefs.remove('flutter.pending_add_call_type');
+      try {
+        await ch.invokeMethod('clearPendingAddPhone');
+      } catch (_) {}
+
+      if (!mounted) {
+        _openingAdd = false;
         return;
       }
-      if (!mounted) return;
-      await Navigator.of(context).push(
+      await Navigator.push(
+        context,
         MaterialPageRoute(
           builder: (_) => AddCustomerPage(initialPhone: n, fromCall: true, callType: callType),
         ),
       );
+      _openingAdd = false;
       _load();
-    } catch (_) {}
+    } catch (_) {
+      _openingAdd = false;
+    }
   }
 
   

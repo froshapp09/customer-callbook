@@ -79,11 +79,27 @@ class MainActivity : FlutterActivity() {
         captureAddIntent(intent)
     }
 
+    override fun onResume() {
+        super.onResume()
+        captureAddIntent(intent)
+    }
+
     private fun captureAddIntent(intent: Intent?) {
         if (intent == null) return
-        val action = intent.action ?: return
-        if (action == ACTION_ADD_CUSTOMER || action == ACTION_OPEN_CUSTOMER) {
-            pendingAddNumber = intent.getStringExtra(EXTRA_NUMBER)
+        val action = intent.action
+        val num = intent.getStringExtra(EXTRA_NUMBER)
+        if (!num.isNullOrBlank()) {
+            // حتی بدون action هم اگر number آمده ذخیره کن
+            if (action == ACTION_ADD_CUSTOMER || action == ACTION_OPEN_CUSTOMER || action == null || intent.hasExtra(EXTRA_NUMBER)) {
+                pendingAddNumber = num
+                try {
+                    getSharedPreferences("FlutterSharedPreferences", MODE_PRIVATE).edit()
+                        .putString("flutter.pending_add_phone", num)
+                        .putString("pending_add_phone", num)
+                        .putString("flutter.pending_add_mode", "save")
+                        .commit()
+                } catch (_: Exception) {}
+            }
         }
     }
 
@@ -130,20 +146,25 @@ class MainActivity : FlutterActivity() {
                         result.success(true)
                     }
                     "getPendingAddPhone" -> {
+                        // شماره را پاک نکن تا Flutter بعد از باز شدن صفحه ذخیره clear کند
                         var n = pendingAddNumber
-                        pendingAddNumber = null
                         if (n.isNullOrBlank()) {
                             try {
                                 val prefs = getSharedPreferences("FlutterSharedPreferences", MODE_PRIVATE)
                                 n = prefs.getString("flutter.pending_add_phone", null)
-                                if (!n.isNullOrBlank()) {
-                                    prefs.edit()
-                                        .remove("flutter.pending_add_phone")
-                                        .remove("flutter.pending_add_mode")
-                                        .apply()
-                                }
+                                    ?: prefs.getString("pending_add_phone", null)
                             } catch (_: Exception) {
                             }
+                        }
+                        // از intent فعلی هم بخوان (اگر تازه از اعلان آمده)
+                        if (n.isNullOrBlank()) {
+                            try {
+                                val extra = intent?.getStringExtra(EXTRA_NUMBER)
+                                if (!extra.isNullOrBlank()) {
+                                    n = extra
+                                    pendingAddNumber = extra
+                                }
+                            } catch (_: Exception) {}
                         }
                         result.success(n)
                     }
@@ -656,7 +677,7 @@ class CallMonitorService : Service() {
                 .putString("flutter.pending_add_phone", number)
                 .putString("flutter.pending_add_mode", mode)
                 .putString("flutter.pending_add_call_type", callType)
-                .apply()
+                .putString("pending_add_phone", number).putString("pending_add_mode", mode).putString("pending_add_call_type", callType).commit()
         } catch (_: Exception) {
         }
     }
@@ -1553,7 +1574,7 @@ class PhoneStateReceiver : BroadcastReceiver() {
                 .putString("flutter.pending_add_phone", number)
                 .putString("flutter.pending_add_mode", mode)
                 .putString("flutter.pending_add_call_type", callType)
-                .apply()
+                .putString("pending_add_phone", number).putString("pending_add_mode", mode).putString("pending_add_call_type", callType).commit()
         } catch (_: Exception) {
         }
     }
