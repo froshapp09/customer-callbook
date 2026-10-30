@@ -57,7 +57,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
           // call log may map to phone on some devices
           await Permission.phone.request();
         } catch (_) {}
-        await CallListenerService.instance.enableAndStart();
+        try { await CallListenerService.instance.enableAndStart(); } catch (_) {}
       } else if (_step == 1) {
         try {
           const ch = MethodChannel('ir.apadanasleep.customer_callbook/call_log');

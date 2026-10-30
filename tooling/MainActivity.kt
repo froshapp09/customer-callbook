@@ -188,7 +188,9 @@ class MainActivity : FlutterActivity() {
                             }
                             result.success(true)
                         } catch (e: Exception) {
-                            result.error("ERROR", e.message, null)
+                            // اپ نباید به خاطر سرویس کرش کند
+                            android.util.Log.e("MainActivity", "startCallMonitor: ${e.message}")
+                            result.success(false)
                         }
                     }
                     "stopCallMonitor" -> {
@@ -441,38 +443,53 @@ class CallMonitorService : Service() {
     }
 
     private fun startAsForeground() {
-        val chId = "call_monitor_fg"
-        val nm = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val ch = NotificationChannel(
-                chId,
-                "مانیتور تماس",
-                NotificationManager.IMPORTANCE_LOW
-            ).apply {
-                description = "سرویس شناسایی تماس فعال است"
-                setShowBadge(false)
+        try {
+            val chId = "call_monitor_fg"
+            val nm = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                val ch = NotificationChannel(
+                    chId,
+                    "مانیتور تماس",
+                    NotificationManager.IMPORTANCE_LOW
+                ).apply {
+                    description = "سرویس شناسایی تماس فعال است"
+                    setShowBadge(false)
+                }
+                nm.createNotificationChannel(ch)
             }
-            nm.createNotificationChannel(ch)
-        }
-        val open = packageManager.getLaunchIntentForPackage(packageName)
-        val pi = if (open != null) {
-            PendingIntent.getActivity(
-                this, 0, open,
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-            )
-        } else null
-        val n = NotificationCompat.Builder(this, chId)
-            .setSmallIcon(android.R.drawable.sym_call_incoming)
-            .setContentTitle("فروشیار")
-            .setContentText("شناسایی تماس فعال است")
-            .setOngoing(true)
-            .setContentIntent(pi)
-            .setPriority(NotificationCompat.PRIORITY_MIN)
-            .build()
-        if (Build.VERSION.SDK_INT >= 34) {
-            startForeground(9001, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_PHONE_CALL)
-        } else {
-            startForeground(9001, n)
+            val open = packageManager.getLaunchIntentForPackage(packageName)
+            val pi = if (open != null) {
+                PendingIntent.getActivity(
+                    this, 0, open,
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                )
+            } else null
+            val n = NotificationCompat.Builder(this, chId)
+                .setSmallIcon(android.R.drawable.ic_menu_call)
+                .setContentTitle("فروشیار")
+                .setContentText("شناسایی تماس فعال است")
+                .setOngoing(true)
+                .setContentIntent(pi)
+                .setPriority(NotificationCompat.PRIORITY_MIN)
+                .build()
+            // phoneCall type بدون بودن دیالر پیش‌فرض روی شیائومی کرش می‌دهد
+            if (Build.VERSION.SDK_INT >= 34) {
+                try {
+                    startForeground(
+                        9001, n,
+                        ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
+                    )
+                } catch (e: Exception) {
+                    try {
+                        startForeground(9001, n)
+                    } catch (_: Exception) {}
+                }
+            } else {
+                startForeground(9001, n)
+            }
+        } catch (e: Exception) {
+            // هرگز سرویس را به خاطر نوتیفیکیشن نکُش
+            android.util.Log.e("CallMonitor", "startAsForeground: ${e.message}")
         }
     }
 
